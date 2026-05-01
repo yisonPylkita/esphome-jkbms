@@ -210,6 +210,37 @@ No custom retry, watchdog, or fault-recovery logic in our YAML. If a real failur
 - **R3 — BMS firmware variance.** Different JK-PB firmware revisions have shipped different field layouts. Mitigation: enable UART debug on first run, compare against upstream test fixtures, file an issue if mismatch.
 - **R4 — Strapping pin accident.** Reusing GPIO 8/9 later for an output would brick boot. Mitigation: comments in YAML calling out the strapping constraints.
 
+## 9a. Implementation correction — component naming
+
+During implementation it turned out that `syssi/esphome-jk-bms` does not
+ship a `jk_rs485_bms` external component on `main`. The JK-PB inverter
+BMS support that landed via PR #464 actually uses **stock ESPHome
+`modbus` + `modbus_controller`** with the JK-PB register map written
+directly in YAML; the upstream example file is
+`esp32-jk-pb-modbus-example.yaml`.
+
+Decision: vendor that register map locally as
+`packages/jk-pb-modbus.yaml` and let `jk-pb-bms.yaml` own only the
+device profile + network stack. This removes the external-components
+dependency entirely (so risk R2 is downgraded) and produces a
+self-contained config that compiles cleanly today and is auditable in
+diff against future upstream revisions. Verified by:
+
+```
+esphome config  jk-pb-bms.yaml  -> Configuration is valid
+esphome compile jk-pb-bms.yaml  -> SUCCESS, firmware.factory.bin built
+```
+
+The §5 "entities exposed" inventory is still accurate in spirit; the
+exact field names and address coverage are governed by the vendored
+register map. Compared to the original list, the vendored map adds
+ample additional fields (extra temperature sensors, charge/discharge
+SCPR/OCPR countdowns, wire resistances per cell, configurable BMS
+parameters such as cell UVP / OVP / RCV / RFV / SOC limits read back as
+sensors). The deliberately-deferred control entities (charge/discharge/
+balancer enable selects) were stripped from the vendored file in line
+with the §5 read-only-v1 decision.
+
 ## 10. Sources
 
 - [syssi/esphome-jk-bms](https://github.com/syssi/esphome-jk-bms)
