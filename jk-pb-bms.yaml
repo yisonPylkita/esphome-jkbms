@@ -47,3 +47,30 @@ captive_portal:
 web_server:
   port: 80
   version: 3
+
+external_components:
+  - source: github://syssi/esphome-jk-bms@main
+    components: [jk_rs485_bms]
+    refresh: 1d
+
+uart:
+  - id: uart_0
+    baud_rate: 115200
+    tx_pin: ${uart_tx_pin}
+    rx_pin: ${uart_rx_pin}
+    rx_buffer_size: 384
+    # debug:
+    #   direction: BOTH
+    #   dummy_receiver: false
+    #   after:
+    #     delimiter: "\n"
+    #   sequence:
+    #     - lambda: UARTDebug::log_hex(direction, bytes, ' ');
+
+jk_rs485_bms:
+  - id: bms0
+    uart_id: uart_0
+    address: ${bms_address}
+    rx_timeout: 50ms
+    update_interval: ${update_interval}
+    flow_control_pin: ${rs485_de_pin}
