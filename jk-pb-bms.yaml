@@ -1,0 +1,28 @@
+# JK-PB2A16S20P over RS485 -> ESP32-C3 Super Mini -> Home Assistant.
+# See docs/superpowers/specs/2026-05-01-jk-pb-esphome-integration-design.md
+# Pin choices avoid ESP32-C3 strapping pins (GPIO 2/8/9) and reserved
+# native-USB pins (GPIO 18/19).
+
+substitutions:
+  device_name: jk-pb-bms
+  device_friendly_name: "JK-PB BMS"
+  bms_address: "0x01"
+  update_interval: 30s
+  uart_tx_pin: GPIO21
+  uart_rx_pin: GPIO20
+  rs485_de_pin: GPIO10
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${device_friendly_name}
+  min_version: 2025.11.0
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: ESP32C3
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+  hardware_uart: USB_SERIAL_JTAG
