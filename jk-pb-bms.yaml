@@ -1,19 +1,24 @@
 # JK-PB2A16S20P over RS485 -> ESP32-C3 Super Mini -> Home Assistant.
 # See docs/superpowers/specs/2026-05-01-jk-pb-esphome-integration-design.md
-# Pin choices avoid ESP32-C3 strapping pins (GPIO 2/8/9) and reserved
-# native-USB pins (GPIO 18/19).
+#
+# The BMS-side Modbus register map lives in packages/jk-pb-modbus.yaml.
+# This top-level file owns the device profile, network stack, and pin map.
+#
+# Pin choices avoid ESP32-C3 strapping pins (GPIO 2/8/9) and reserved native
+# USB-CDC pins (GPIO 18/19).
 
 substitutions:
-  device_name: jk-pb-bms
+  name: jk-pb-bms
   device_friendly_name: "JK-PB BMS"
-  bms_address: "0x01"
-  update_interval: 30s
+  device_addr: "1"
+  modbus_controller_update_interval: "30s"
+  bms_control_params_skip_updates: "20"
   uart_tx_pin: GPIO21
   uart_rx_pin: GPIO20
-  rs485_de_pin: GPIO10
+  flow_control_pin: GPIO10
 
 esphome:
-  name: ${device_name}
+  name: ${name}
   friendly_name: ${device_friendly_name}
   min_version: 2025.11.0
 
@@ -48,109 +53,19 @@ web_server:
   port: 80
   version: 3
 
-external_components:
-  - source: github://syssi/esphome-jk-bms@main
-    components: [jk_rs485_bms]
-    refresh: 1d
-
 uart:
   - id: uart_0
     baud_rate: 115200
     tx_pin: ${uart_tx_pin}
     rx_pin: ${uart_rx_pin}
     rx_buffer_size: 384
-    # debug:
-    #   direction: BOTH
-    #   dummy_receiver: false
-    #   after:
-    #     delimiter: "\n"
-    #   sequence:
-    #     - lambda: UARTDebug::log_hex(direction, bytes, ' ');
 
-jk_rs485_bms:
-  - id: bms0
-    uart_id: uart_0
-    address: ${bms_address}
-    rx_timeout: 50ms
-    update_interval: ${update_interval}
-    flow_control_pin: ${rs485_de_pin}
+packages:
+  bms: !include packages/jk-pb-modbus.yaml
 
-binary_sensor:
-  - platform: jk_rs485_bms
-    jk_rs485_bms_id: bms0
-    balancing:
-      name: "${device_friendly_name} Balancing"
-    charging:
-      name: "${device_friendly_name} Charging"
-    discharging:
-      name: "${device_friendly_name} Discharging"
-    online_status:
-      name: "${device_friendly_name} Online"
-
+# Diagnostic entities (own this device — kept out of the BMS package so the
+# package stays a pure register map).
 sensor:
-  - platform: jk_rs485_bms
-    jk_rs485_bms_id: bms0
-    total_voltage:
-      name: "${device_friendly_name} Total Voltage"
-    current:
-      name: "${device_friendly_name} Current"
-    power:
-      name: "${device_friendly_name} Power"
-    state_of_charge:
-      name: "${device_friendly_name} State of Charge"
-    capacity_remaining:
-      name: "${device_friendly_name} Capacity Remaining"
-    total_runtime:
-      name: "${device_friendly_name} Total Runtime"
-    min_cell_voltage:
-      name: "${device_friendly_name} Min Cell Voltage"
-    max_cell_voltage:
-      name: "${device_friendly_name} Max Cell Voltage"
-    delta_cell_voltage:
-      name: "${device_friendly_name} Delta Cell Voltage"
-    average_cell_voltage:
-      name: "${device_friendly_name} Average Cell Voltage"
-    cell_voltage_1:
-      name: "${device_friendly_name} Cell 1 Voltage"
-    cell_voltage_2:
-      name: "${device_friendly_name} Cell 2 Voltage"
-    cell_voltage_3:
-      name: "${device_friendly_name} Cell 3 Voltage"
-    cell_voltage_4:
-      name: "${device_friendly_name} Cell 4 Voltage"
-    cell_voltage_5:
-      name: "${device_friendly_name} Cell 5 Voltage"
-    cell_voltage_6:
-      name: "${device_friendly_name} Cell 6 Voltage"
-    cell_voltage_7:
-      name: "${device_friendly_name} Cell 7 Voltage"
-    cell_voltage_8:
-      name: "${device_friendly_name} Cell 8 Voltage"
-    cell_voltage_9:
-      name: "${device_friendly_name} Cell 9 Voltage"
-    cell_voltage_10:
-      name: "${device_friendly_name} Cell 10 Voltage"
-    cell_voltage_11:
-      name: "${device_friendly_name} Cell 11 Voltage"
-    cell_voltage_12:
-      name: "${device_friendly_name} Cell 12 Voltage"
-    cell_voltage_13:
-      name: "${device_friendly_name} Cell 13 Voltage"
-    cell_voltage_14:
-      name: "${device_friendly_name} Cell 14 Voltage"
-    cell_voltage_15:
-      name: "${device_friendly_name} Cell 15 Voltage"
-    cell_voltage_16:
-      name: "${device_friendly_name} Cell 16 Voltage"
-    temperature_sensor_1:
-      name: "${device_friendly_name} Temperature 1"
-    temperature_sensor_2:
-      name: "${device_friendly_name} Temperature 2"
-    power_tube_temperature:
-      name: "${device_friendly_name} Power Tube Temperature"
-    balancing_current:
-      name: "${device_friendly_name} Balancing Current"
-
   - platform: wifi_signal
     name: "${device_friendly_name} WiFi Signal"
     update_interval: 60s
@@ -162,15 +77,6 @@ sensor:
     name: "${device_friendly_name} Internal Temperature"
 
 text_sensor:
-  - platform: jk_rs485_bms
-    jk_rs485_bms_id: bms0
-    errors:
-      name: "${device_friendly_name} Errors"
-    total_runtime_formatted:
-      name: "${device_friendly_name} Total Runtime Formatted"
-    operation_mode:
-      name: "${device_friendly_name} Operation Mode"
-
   - platform: wifi_info
     ip_address:
       name: "${device_friendly_name} IP Address"
