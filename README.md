@@ -73,6 +73,13 @@ component pinned. To pull in upstream improvements, diff
 `esp32-jk-pb-modbus-example.yaml` from `syssi/esphome-jk-bms` and merge
 selectively.
 
+## License
+
+MIT for the original code in this repo (see [`LICENSE`](LICENSE)). The
+vendored Modbus register map at [`packages/jk-pb-modbus.yaml`](packages/jk-pb-modbus.yaml)
+is Apache-2.0 (derivative of `syssi/esphome-jk-bms`); see
+[`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt).
+
 ## Reference
 
 - Design spec: [docs/superpowers/specs/2026-05-01-jk-pb-esphome-integration-design.md](docs/superpowers/specs/2026-05-01-jk-pb-esphome-integration-design.md)

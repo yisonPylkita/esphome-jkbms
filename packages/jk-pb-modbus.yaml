@@ -1,6 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Sebastian Muszynski and contributors to syssi/esphome-jk-bms
+#
 # JK-PB Modbus register map.
 #
 # Source: syssi/esphome-jk-bms/esp32-jk-pb-modbus-example.yaml @ main
+# Upstream license: Apache License, Version 2.0
+# Full license text: ../LICENSES/Apache-2.0.txt
+#
 # Vendored on 2026-05-01 with the following local changes:
 #   - Stripped device-level blocks (esphome, esp32, wifi, mqtt, ota, logger).
 #   - Removed the `select:` block (charge/discharge/balance enable controls)
