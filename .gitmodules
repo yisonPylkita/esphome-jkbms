@@ -1,0 +1,3 @@
+[submodule "vendor/esphome-jk-bms"]
+	path = vendor/esphome-jk-bms
+	url = https://github.com/syssi/esphome-jk-bms
