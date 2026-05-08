@@ -44,7 +44,7 @@ esp32:
     type: esp-idf
 
 logger:
-  level: INFO
+  level: DEBUG
   hardware_uart: USB_SERIAL_JTAG
 
 api:
@@ -58,6 +58,13 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  # ESP32-C3 reliability tweaks: pin auth mode, disable power-save, skip
+  # full scan, cap TX power. Without these the C3 often drops or fails
+  # to associate on dense 2.4 GHz networks.
+  min_auth_mode: WPA2
+  power_save_mode: NONE
+  fast_connect: true
+  output_power: 8.5
   ap:
     ssid: "${device_friendly_name} Fallback"
     password: !secret ap_password
