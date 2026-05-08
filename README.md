@@ -5,9 +5,11 @@ ESP32-C3 Super Mini over RS485 and publishes all relevant entities to
 Home Assistant via the native API.
 
 Implementation is **stock ESPHome** — no Bluetooth, no external custom
-component. The JK-PB Modbus register map is vendored under
-[`packages/jk-pb-modbus.yaml`](packages/jk-pb-modbus.yaml) (adapted from
-[syssi/esphome-jk-bms `esp32-jk-pb-modbus-example.yaml`](https://github.com/syssi/esphome-jk-bms/blob/main/esp32-jk-pb-modbus-example.yaml)).
+component. Everything (device profile, network stack, JK-PB Modbus
+register map) lives in a single file: [`jk-pb-bms.yaml`](jk-pb-bms.yaml).
+The register map is adapted from
+[syssi/esphome-jk-bms `esp32-jk-pb-modbus-example.yaml`](https://github.com/syssi/esphome-jk-bms/blob/main/esp32-jk-pb-modbus-example.yaml)
+(pinned as a git submodule under `vendor/esphome-jk-bms` for reference).
 
 ## Hardware
 
@@ -67,18 +69,24 @@ Devices & Services → ESPHome → Add. Provide the API encryption key from
 
 ## Reproducibility
 
-The Modbus register map is a static, vendored copy. There is no upstream
-component pinned. To pull in upstream improvements, diff
-`packages/jk-pb-modbus.yaml` against the latest
-`esp32-jk-pb-modbus-example.yaml` from `syssi/esphome-jk-bms` and merge
-selectively.
+The Modbus register map is a static, vendored copy embedded in
+`jk-pb-bms.yaml`. There is no upstream ESPHome component pinned. To pull
+in upstream improvements:
+
+```bash
+git submodule update --remote vendor/esphome-jk-bms
+diff -u vendor/esphome-jk-bms/esp32-jk-pb-modbus-example.yaml jk-pb-bms.yaml
+```
+
+Then merge changes selectively into `jk-pb-bms.yaml`.
 
 ## License
 
 MIT for the original code in this repo (see [`LICENSE`](LICENSE)). The
-vendored Modbus register map at [`packages/jk-pb-modbus.yaml`](packages/jk-pb-modbus.yaml)
-is Apache-2.0 (derivative of `syssi/esphome-jk-bms`); see
-[`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt).
+register-map portion of [`jk-pb-bms.yaml`](jk-pb-bms.yaml) is Apache-2.0
+(derivative of `syssi/esphome-jk-bms`); see
+[`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt). Combined SPDX
+expression on the file: `MIT AND Apache-2.0`.
 
 ## Reference
 
