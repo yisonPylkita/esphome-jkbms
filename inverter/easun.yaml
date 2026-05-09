@@ -1,0 +1,212 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Wojciech Bartnik
+#
+# Easun Power 10.2kW 48V hybrid inverter -> ESP32 -> Home Assistant.
+#
+# Easun is a Voltronic-clone (same firmware family as MPP Solar / Axpert /
+# InfiniSolar / Mecer). Protocol: text command/response on RS232 at 2400 8N1.
+# Uses syssi/esphome-pipsolar's `pip8048` component (the 48V-class variant
+# of his pipsolar codebase — repo split into pip8048 / pip2424mse1 in 2026).
+#
+# Hardware:
+#   - Inverter "RS232" port (DB9 or RJ45 — check label) at TTL/RS232 levels.
+#   - For RS232 levels (±12V): MAX3232 between inverter and ESP UART.
+#   - For TTL levels: direct wire.
+#   - Many Easun units expose USB on the front; that's USB-HID with the same
+#     protocol. Stick to RS232 for cleanest ESPHome integration.
+#
+# Pin layout (ESP32-C3 Super Mini — swap for whichever ESP32 is on hand):
+#   GPIO 4 -> TX (to inverter RX)
+#   GPIO 5 -> RX (from inverter TX)
+#   GND   -> GND of MAX3232 + inverter
+#   3V3   -> Vcc of MAX3232
+#
+# Secrets (own keys, isolated from BMS device):
+#   easun_api_encryption_key — `openssl rand -base64 32`
+#   easun_ota_password       — `openssl rand -hex 16`
+#
+# Validate:
+#   .venv/bin/esphome config inverter/easun.yaml
+#   .venv/bin/esphome compile inverter/easun.yaml
+
+substitutions:
+  name: easun-inverter
+  device_friendly_name: "Easun Inverter"
+  uart_tx_pin: GPIO4
+  uart_rx_pin: GPIO5
+
+esphome:
+  name: ${name}
+  friendly_name: ${device_friendly_name}
+  min_version: 2026.3.0
+  on_boot:
+    - priority: 800.0
+      then:
+        - logger.log:
+            format: "[EASUN] === Boot start === Voltronic over RS232 @ 2400 baud"
+            level: INFO
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: ESP32C3
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://syssi/esphome-pipsolar@main
+    refresh: 0s
+    components: [pip8048]
+
+logger:
+  level: DEBUG
+  hardware_uart: USB_SERIAL_JTAG
+  logs:
+    component: WARN
+    scheduler: WARN
+    sensor: INFO
+    wifi: WARN
+    api: WARN
+
+api:
+  encryption:
+    key: !secret easun_api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret easun_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  min_auth_mode: WPA2
+  power_save_mode: NONE
+  fast_connect: false
+  output_power: 8.5
+  ap:
+    ssid: "${device_friendly_name} Fallback"
+    password: !secret ap_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+
+time:
+  - platform: homeassistant
+    id: ha_time
+
+# ---- Voltronic UART link ----
+uart:
+  - id: uart_inv
+    tx_pin: ${uart_tx_pin}
+    rx_pin: ${uart_rx_pin}
+    baud_rate: 2400
+    rx_buffer_size: 384
+
+pip8048:
+  - id: inv0
+    uart_id: uart_inv
+
+# ---- ESP diagnostics ----
+sensor:
+  - platform: wifi_signal
+    name: "${device_friendly_name} WiFi Signal"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "${device_friendly_name} Uptime"
+
+  - platform: internal_temperature
+    name: "${device_friendly_name} Internal Temperature"
+
+  # ---- Inverter live data (QPIGS) ----
+  - platform: pip8048
+    pipsolar_id: inv0
+
+    # Grid side
+    grid_voltage:
+      name: "grid voltage"
+    grid_frequency:
+      name: "grid frequency"
+
+    # AC output side (house loads)
+    ac_output_voltage:
+      name: "ac out voltage"
+    ac_output_frequency:
+      name: "ac out frequency"
+    ac_output_apparent_power:
+      name: "ac out apparent power"
+    ac_output_active_power:
+      name: "ac out active power"
+    output_load_percent:
+      name: "ac out load percent"
+
+    # Battery side (cross-check against BMS)
+    battery_voltage:
+      name: "battery voltage (inv)"
+    battery_charging_current:
+      name: "battery charging current (inv)"
+    battery_discharge_current:
+      name: "battery discharge current (inv)"
+    battery_capacity_percent:
+      name: "battery soc (inv)"
+    battery_voltage_scc:
+      name: "scc battery voltage"
+
+    # PV side (only one MPPT on most Easuns; pv2 may be unused)
+    pv1_input_voltage:
+      name: "pv voltage"
+    pv1_input_current:
+      name: "pv current"
+    pv1_charging_power:
+      name: "pv power"
+
+    # Inverter health
+    inverter_heat_sink_temperature:
+      name: "inverter heat sink temperature"
+    bus_voltage:
+      name: "bus voltage"
+
+binary_sensor:
+  - platform: pip8048
+    pipsolar_id: inv0
+    load_status:
+      name: "load on"
+    charging_status:
+      name: "charging"
+    charging_to_floating_mode:
+      name: "charging floating"
+    scc_charging_status:
+      name: "scc charging"
+    ac_charging_status:
+      name: "ac charging"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${device_friendly_name} IP"
+    ssid:
+      name: "${device_friendly_name} SSID"
+
+  - platform: pip8048
+    pipsolar_id: inv0
+    # QMOD: P=power on, S=standby, L=line, B=battery, F=fault, H=power saving
+    device_mode:
+      name: "inverter mode"
+    last_qpigs:
+      name: "last qpigs raw"
+      internal: true        # debugging — toggle false to expose
+    last_qpiri:
+      name: "last qpiri raw"
+      internal: true
+    last_qmod:
+      name: "last qmod raw"
+      internal: true
+    last_qflag:
+      name: "last qflag raw"
+      internal: true
+
+button:
+  - platform: restart
+    name: "${device_friendly_name} Restart"
