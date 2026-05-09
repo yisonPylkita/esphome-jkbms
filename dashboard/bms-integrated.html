@@ -283,13 +283,13 @@
         <g id="gauge-ticks"></g>
         <!-- SOC ghost (faint "888") -->
         <text id="soc-ghost" class="soc-svg-text soc-ghost"
-              x="50" y="47" text-anchor="middle" font-size="24" dominant-baseline="alphabetic">88</text>
+              x="50" y="50" text-anchor="middle" font-size="24" dominant-baseline="alphabetic">88</text>
         <!-- SOC digits -->
         <text id="soc-digits" class="soc-svg-text soc-amber"
-              x="50" y="47" text-anchor="middle" font-size="24" dominant-baseline="alphabetic">--</text>
+              x="50" y="50" text-anchor="middle" font-size="24" dominant-baseline="alphabetic">--</text>
         <!-- % glyph (positioned dynamically next to digits) -->
         <text id="soc-pct" class="soc-svg-pct soc-amber"
-              x="68" y="42" text-anchor="start" font-size="8">%</text>
+              x="68" y="45" text-anchor="start" font-size="8">%</text>
       </svg>
     </div>
 
@@ -440,7 +440,9 @@
 
     // ---- SOC readout (SVG text) — digits + ghost "88" backplate + dynamic
     //      % positioning. Zone colour: red < 30, amber mid, green ≥ 70.
+    let _lastSoc = NaN;
     function updateSocReadout(soc) {
+      _lastSoc = soc;
       const v = String(Math.max(0, Math.min(100, Math.round(soc))));
       const digits = $('soc-digits');
       const ghost = $('soc-ghost');
@@ -595,6 +597,16 @@
     buildBatteryBar();
     tick();
     setInterval(tick, POLL_MS);
+
+    // Re-measure %-glyph position once DSEG7 web font is loaded — first paint
+    // happens against the monospace fallback (narrower), so getBBox returns a
+    // shorter width and the % glyph lands too close to the digits. After fonts
+    // load we reposition with the correct metrics.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        if (!isNaN(_lastSoc)) updateSocReadout(_lastSoc);
+      });
+    }
     document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 
     // Keyboard shortcut: A → switch to advanced view.
