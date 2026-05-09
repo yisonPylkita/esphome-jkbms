@@ -88,24 +88,34 @@
       mix-blend-mode: screen; opacity: 0.7;
     }
 
-    /* Stale banner — only visible when BMS link drops. */
+    /* Lost-connection overlay — small red box top-left. Shows when the
+       BMS hasn't sent fresh data in the last 5 s. */
     .stale {
-      position: fixed; top: 0; left: 0; right: 0;
-      padding: 14px;
-      padding-top: max(14px, env(safe-area-inset-top));
-      background: var(--bms-red-dim);
-      border-bottom: 1px solid var(--bms-red);
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      padding: 10px 14px;
+      background: rgba(255, 46, 61, 0.18);
+      border: 1px solid var(--bms-red);
+      border-radius: 8px;
       color: var(--bms-red);
       text-shadow: 0 0 10px var(--bms-red-glow);
-      text-align: center;
       font-family: ui-monospace, "JetBrains Mono", monospace;
       font-weight: 700; letter-spacing: 0.1em;
-      font-size: 14px;
-      transform: translateY(-100%);
-      transition: transform 0.3s;
+      font-size: clamp(11px, 1.6dvh, 16px);
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 0 16px rgba(255, 46, 61, 0.35);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease;
       z-index: 100;
     }
-    .stale.visible { transform: translateY(0); }
+    .stale.visible { opacity: 1; pointer-events: auto; }
+    .stale .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--bms-red);
+      box-shadow: 0 0 8px var(--bms-red-glow);
+      animation: bms-pulse 1.2s ease-in-out infinite;
+    }
 
     /* TopBar — voltage left, temperature right, both at the same baseline. */
     .topbar {
@@ -209,6 +219,9 @@
     .power.charging    { color: var(--bms-green); }
     .power.discharging { color: var(--bms-red); }
     .power.idle        { color: var(--bms-cyan); }
+    /* Hide the flow icon in idle state — its horizontal stroke visually
+       reads as a minus sign next to "0 W". */
+    .power.idle .flow-icon { visibility: hidden; }
     .power-num {
       font-size: clamp(40px, 11dvh, 12vw); line-height: 1;
       text-shadow: 0 0 22px currentColor;
@@ -233,7 +246,7 @@
 </head>
 <body>
 
-  <div class="stale" id="stale">⚠ NO LINK</div>
+  <div class="stale" id="stale"><span class="dot"></span><span>BMS — NO LINK</span></div>
 
   <main class="bms-screen" id="screen">
     <!-- row 1: top gutter -->
@@ -295,7 +308,7 @@
     <!-- row 8: Power readout -->
     <div class="power-row">
       <div class="power discharging" id="power-row-inner">
-        <svg class="icon" viewBox="0 0 16 16" id="flow-icon" style="filter: drop-shadow(0 0 6px currentColor); width: 28px; height: 28px;">
+        <svg class="icon flow-icon" viewBox="0 0 16 16" id="flow-icon" style="filter: drop-shadow(0 0 6px currentColor); width: 28px; height: 28px;">
           <path id="flow-path" d="M3 5l5 5 5-5M3 9l5 5 5-5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span class="seg power-num" id="power-num">---</span>
@@ -533,11 +546,14 @@
         const tVals = temps.filter(x => x && !isNaN(parseFloat(x.state))).map(x => parseFloat(x.state));
         const tMax = tVals.length ? Math.max(...tVals) : NaN;
 
-        // Staleness drives the NO-LINK banner. Use the `online_status`
-        // binary sensor as the authoritative signal — time-based checks on
-        // last_updated trip falsely when power sits at exactly 0 W and
-        // ESPHome dedupes equal-value updates.
-        const stale = !online || isNaN(soc);
+        // Staleness: triggers the NO-LINK overlay if EITHER the BMS link
+        // is reported down OR voltage hasn't been pushed in > 5 s. We use
+        // voltage's last_updated because total_voltage jitters on every BMS
+        // notification while idle power can dedupe to a flat 0 W and never
+        // refresh its own last_updated.
+        const STALE_GRACE_MS = 5000;
+        const voltAgeMs = Date.now() - new Date(v.last_updated).getTime();
+        const stale = !online || isNaN(soc) || voltAgeMs > STALE_GRACE_MS;
         $('stale').classList.toggle('visible', stale);
 
         if (!isNaN(soc)) {

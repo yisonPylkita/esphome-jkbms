@@ -2,10 +2,10 @@
 # SPDX-FileCopyrightText: 2026 Wojciech Bartnik
 # SPDX-FileCopyrightText: Sebastian Muszynski and contributors to syssi/esphome-jk-bms
 #
-# JK-PB2A16S20P over BLE -> ESP32-C3 -> Home Assistant -> Node-RED + dashboard.
-#
-# FULL build with extended capabilities. Read-only — exposes everything the
-# JK02_32S BLE protocol decodes that's interesting at the system level.
+# ESPHome firmware for an ESP32-C3 that bridges a JK BMS to Home Assistant
+# over Bluetooth Low Energy. Read-only — exposes everything the JK02_32S
+# BLE protocol decodes (SOC, voltage, current, power, cell voltages,
+# resistances, temperatures, balancing, errors).
 
 substitutions:
   name: jk-pb-bms
