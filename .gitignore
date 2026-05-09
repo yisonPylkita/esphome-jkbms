@@ -6,5 +6,11 @@ build/
 __pycache__/
 .venv/
 
+# Lighthouse / audit / report artefacts — keep them out of source.
+*.pdf
+
+# Backup files made by deploy script or manual edits.
+*.bak.*
+
 # Dashboard with embedded HA token — local-only, never commit.
 dashboard/*.local.html

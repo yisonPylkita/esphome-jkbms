@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0a0a0a" />
   <title>BMS · diagnostic</title>
   <style>
@@ -217,7 +217,10 @@
 
   <script>
     // ============================================================
-    // CONFIG — edit only TOKEN (and ENTITIES if you renamed them).
+    // CONFIG. The TOKEN placeholder is substituted at deploy time by
+    // scripts/deploy-ha.sh from the value in secrets.yaml — don't hand-
+    // edit this file. ENTITIES below should match the names defined in
+    // jk-pb-bms.yaml (HA prefixes them with `sensor.jk_pb_bms_`).
     // HA_URL stays empty so the page works whether reached via LAN,
     // Tailscale magic DNS, or `tailscale serve` HTTPS hostname — all
     // requests go to the same origin that served this page.
