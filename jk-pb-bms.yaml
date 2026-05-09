@@ -30,8 +30,9 @@ esp32:
     type: esp-idf
 
 external_components:
-  - source: github://syssi/esphome-jk-bms@main
-    refresh: 0s
+  # Pinned to a specific commit for reproducible builds. Bump when you
+  # actually want a newer revision of jk_bms_ble; don't track @main blindly.
+  - source: github://syssi/esphome-jk-bms@24e9187ddc55eafc29fcc00b9172bb9ea1b1ad72
 
 logger:
   level: DEBUG

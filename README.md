@@ -39,16 +39,7 @@ That's it — only BLE.
   ```
 - A Home Assistant instance (any flavour).
 
-### 1. Pull submodule (BLE component)
-
-```
-git submodule update --init
-```
-
-`vendor/esphome-jk-bms` is pinned for offline reference; the YAML pulls
-the same component from GitHub at compile time.
-
-### 2. Find the BMS BLE MAC
+### 1. Find the BMS BLE MAC
 
 Open the JK BMS app on a phone, note the device's Bluetooth name (usually
 `JK_BMS_*` or model-named). For first flash, leave `ble_client.mac_address`
@@ -56,7 +47,7 @@ in `jk-pb-bms.yaml` as a placeholder; the firmware logs every BLE
 advertisement it sees on boot, and the JK MAC is identifiable by name.
 Put the real MAC in once you know it.
 
-### 3. Fill in `secrets.yaml`
+### 2. Fill in `secrets.yaml`
 
 Copy the template:
 
@@ -68,7 +59,7 @@ Fill in WiFi creds, ESPHome API encryption key, OTA password, AP password.
 The encryption key is shared between the firmware and the HA integration —
 generate one with `openssl rand -base64 32`.
 
-### 4. Build + flash
+### 3. Build + flash
 
 First flash via USB:
 
@@ -82,14 +73,14 @@ Subsequent updates OTA from the same network:
 .venv/bin/esphome run jk-pb-bms.yaml
 ```
 
-### 5. Add to Home Assistant
+### 4. Add to Home Assistant
 
 After the device boots and joins WiFi, HA auto-discovers it. Accept the
 discovery; HA asks for the API encryption key — paste the same value
 that's in `secrets.yaml`. All entities (SOC, voltage, current, power,
 cell voltages, temperatures, balancing, errors) appear under the device.
 
-### 6. Deploy the dashboards
+### 5. Deploy the dashboards
 
 Each `*.local.html` file is a working copy of its template with the HA
 long-lived access token substituted in. Local copies are gitignored.
@@ -126,11 +117,15 @@ Press **A** on either page to swap to the other.
 ├── dashboard/
 │   ├── bms-integrated.html   Main dashboard
 │   └── dashboard.html        Diagnostic dashboard
-├── inverter/
-│   └── easun.yaml         Easun inverter firmware (unrelated to BMS)
-└── vendor/
-    └── esphome-jk-bms/    syssi/esphome-jk-bms submodule (BLE component)
+└── inverter/
+    └── easun.yaml         Easun inverter firmware (unrelated to BMS)
 ```
+
+The `jk_bms_ble` ESPHome component is fetched from
+[`syssi/esphome-jk-bms`](https://github.com/syssi/esphome-jk-bms) at
+compile time via the `external_components` block in `jk-pb-bms.yaml`.
+The pin is a specific commit hash — bump it deliberately if you want a
+newer revision.
 
 ## Dashboard architecture
 
@@ -147,5 +142,5 @@ blocks `dashboard/*.local.html`.
 ## Licence
 
 - Repository configuration: MIT (see `LICENSE`).
-- The `jk_bms_ble` ESPHome component pulled at build time from
+- The `jk_bms_ble` ESPHome component fetched at build time from
   `syssi/esphome-jk-bms` is Apache-2.0 (see `LICENSES/Apache-2.0.txt`).
