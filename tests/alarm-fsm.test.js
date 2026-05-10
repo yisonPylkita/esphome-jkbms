@@ -108,7 +108,7 @@ test('armed: grace period suppresses immediate trigger', () => {
   assert.strictEqual(r.state, 'armed');
 });
 
-test('armed → triggered on door open after grace', () => {
+test('armed → triggered on door open after grace, reason carries key', () => {
   const t0 = 1_000_000;
   const r = stepAlarm(ctx({
     state: 'armed', stateSince: t0,
@@ -116,10 +116,10 @@ test('armed → triggered on door open after grace', () => {
     doorOpen: true,
   }));
   assert.strictEqual(r.state, 'triggered');
-  assert.match(r.triggerReason, /otwarcie drzwi/);
+  assert.match(r.triggerReason, /\bdoor\b/);
 });
 
-test('armed → triggered on aux motion after grace, reason mentions aux', () => {
+test('armed → triggered on aux motion after grace, reason carries key', () => {
   const t0 = 1_000_000;
   const r = stepAlarm(ctx({
     state: 'armed', stateSince: t0,
@@ -127,10 +127,10 @@ test('armed → triggered on aux motion after grace, reason mentions aux', () =>
     motionAux: true,
   }));
   assert.strictEqual(r.state, 'triggered');
-  assert.match(r.triggerReason, /ruch \(zapasowy\)/);
+  assert.match(r.triggerReason, /\bmotion_aux\b/);
 });
 
-test('armed → triggered combines reasons when multiple sensors trip simultaneously', () => {
+test('armed → triggered combines cause keys when multiple sensors trip simultaneously', () => {
   const t0 = 1_000_000;
   const r = stepAlarm(ctx({
     state: 'armed', stateSince: t0,
@@ -138,9 +138,9 @@ test('armed → triggered combines reasons when multiple sensors trip simultaneo
     doorOpen: true, motionMain: true, motionAux: true,
   }));
   assert.strictEqual(r.state, 'triggered');
-  assert.match(r.triggerReason, /otwarcie drzwi/);
-  assert.match(r.triggerReason, /ruch \(główny\)/);
-  assert.match(r.triggerReason, /ruch \(zapasowy\)/);
+  assert.match(r.triggerReason, /\bdoor\b/);
+  assert.match(r.triggerReason, /\bmotion_main\b/);
+  assert.match(r.triggerReason, /\bmotion_aux\b/);
 });
 
 test('triggered: siren on within siren_duration window', () => {

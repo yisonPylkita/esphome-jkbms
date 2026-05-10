@@ -47,7 +47,7 @@ test('predictLinear — at 100% charging or 0% discharging the maths is degenera
   assert.strictEqual(predictLinear(0,   14400, -500, NOW), null);
 });
 
-test('fmtPredictionParts — same calendar day = "Dziś"', () => {
+test('fmtPredictionParts — same calendar day uses caller-supplied "today" label (default Polish)', () => {
   const now = new Date('2026-05-10T08:00:00');
   const target = new Date('2026-05-10T22:30:00');
   const parts = fmtPredictionParts(target, now);
@@ -55,13 +55,20 @@ test('fmtPredictionParts — same calendar day = "Dziś"', () => {
   assert.match(parts.hhmm, /\d{1,2}[:.]\d{2}/);
 });
 
-test('fmtPredictionParts — next calendar day = "Jutro"', () => {
+test('fmtPredictionParts — next calendar day uses caller-supplied "tomorrow" label', () => {
   const now = new Date('2026-05-10T22:00:00');
   const target = new Date('2026-05-11T07:15:00');
   assert.strictEqual(fmtPredictionParts(target, now).day, 'Jutro');
 });
 
-test('fmtPredictionParts — within a week = Polish weekday short', () => {
+test('fmtPredictionParts — English locale + labels honoured via opts', () => {
+  const now = new Date('2026-05-10T08:00:00');
+  const target = new Date('2026-05-10T22:30:00');
+  const parts = fmtPredictionParts(target, now, { locale: 'en-GB', today: 'Today', tomorrow: 'Tomorrow' });
+  assert.strictEqual(parts.day, 'Today');
+});
+
+test('fmtPredictionParts — within a week = locale-derived weekday short (PL)', () => {
   const now = new Date('2026-05-10T08:00:00');         // Sunday
   const target = new Date('2026-05-13T08:00:00');      // Wednesday
   const day = fmtPredictionParts(target, now).day;

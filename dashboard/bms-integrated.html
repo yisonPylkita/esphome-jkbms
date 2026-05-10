@@ -345,7 +345,7 @@
 </head>
 <body>
 
-  <div class="stale" id="stale"><span class="dot"></span><span>BMS — BRAK POŁĄCZENIA</span></div>
+  <div class="stale" id="stale"><span class="dot"></span><span data-i18n="bms.stale">BMS — BRAK POŁĄCZENIA</span></div>
 
   <main class="bms-screen" id="screen">
     <!-- row 1: TopBar -->
@@ -394,7 +394,7 @@
          Symmetric structure so the eye reads them as a matched pair. -->
     <div class="bottom-row">
       <div class="bottom-cell power discharging" id="power-row-inner">
-        <div class="bottom-label">moc</div>
+        <div class="bottom-label" data-i18n="bms.power">moc</div>
         <div class="bottom-value">
           <svg class="icon flow-icon" viewBox="0 0 16 16" id="flow-icon" style="filter: drop-shadow(0 0 6px currentColor);">
             <path id="flow-path" d="M3 5l5 5 5-5M3 9l5 5 5-5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -414,13 +414,25 @@
 
   </main>
 
-  <a class="toggle-alarm" href="alarm.html" title="Alarm akumulatorów" aria-label="Otwórz panel alarmu">alarm ›</a>
-  <a class="toggle-adv" href="bms-dashboard.html" title="Diagnostyka (po angielsku)" aria-label="Otwórz diagnostykę">diagnostyka ›</a>
+  <a class="toggle-alarm" href="alarm.html"
+     data-i18n="bms.alarmLink" data-i18n-title="bms.alarmTitle" data-i18n-aria="bms.alarmAria"
+     title="Alarm akumulatorów" aria-label="Otwórz panel alarmu">alarm ›</a>
+  <a class="toggle-adv" href="bms-dashboard.html"
+     data-i18n="bms.advLink" data-i18n-title="bms.advTitle" data-i18n-aria="bms.advAria"
+     title="Diagnostyka (po angielsku)" aria-label="Otwórz diagnostykę">diagnostyka ›</a>
 
   <!-- Pure functions extracted for testability — inlined into the deployed
        HTML by scripts/minify-html.py at deploy time. -->
   <script src="lib/zones.js"></script>
   <script src="lib/predict.js"></script>
+  <script src="lib/i18n.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      applyI18n();
+      const stamp = document.querySelector('.build-stamp');
+      if (stamp) stamp.title = t('buildstamp.title', 'dashboard/bms-integrated.html');
+    });
+  </script>
 
   <script>
     // ============================================================
@@ -667,7 +679,7 @@
       if (!Number.isFinite(soc) || !Number.isFinite(voltV)) {
         // leave defaults
       } else if (!Number.isFinite(signedPowerW) || Math.abs(signedPowerW) < POWER_DEAD_W) {
-        dir = 'idle'; lbl = 'spoczynek';
+        dir = 'idle'; lbl = t('bms.idle');
       } else {
         let capacityFullWh = NaN;
         if (Number.isFinite(capTotAh) && capTotAh > 0) {
@@ -681,14 +693,18 @@
           const result = predictLinear(soc, capacityFullWh, ratePowerW);
           if (!result) {
             dir = ratePowerW > 0 ? 'charging' : 'discharging';
-            lbl = ratePowerW > 0 ? 'ładowanie' : 'rozładowanie';
-            sub = 'stabilnie';
+            lbl = t(ratePowerW > 0 ? 'bms.charging' : 'bms.discharging');
+            sub = t('bms.steady');
           } else {
             dir = result.kind === 'empty' ? 'discharging' : 'charging';
             kind = result.kind;
-            lbl = result.kind === 'empty' ? 'do rozładowania' : 'do naładowania';
+            lbl = t(result.kind === 'empty' ? 'bms.toEmpty' : 'bms.toFull');
             const rounded = roundToGrain(result.when, PRED_TIME_GRAIN_MIN);
-            const parts = fmtPredictionParts(rounded);
+            const parts = fmtPredictionParts(rounded, new Date(), {
+              locale: getLang() === 'en' ? 'en-GB' : 'pl-PL',
+              today: t('bms.predict.today'),
+              tomorrow: t('bms.predict.tomorrow'),
+            });
             big = parts.hhmm; sub = parts.day;
           }
         }

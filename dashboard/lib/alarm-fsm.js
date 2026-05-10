@@ -82,10 +82,14 @@ function stepAlarm(ctx) {
       const graceMs = (ctx.armingGraceSeconds || 10) * 1000;
       if (sinceArmedMs < graceMs) break;
 
+      // Emit cause KEYS (not human strings) so the dashboard + Node-RED
+      // push-notification can each localise downstream via the i18n map.
+      // Persisted in HA `input_text.alarm_trigger_reason` as well — keys
+      // are language-stable, human strings drift.
       const reasons = [];
-      if (door)            reasons.push('otwarcie drzwi');
-      if (ctx.motionMain)  reasons.push('ruch (główny)');
-      if (ctx.motionAux)   reasons.push('ruch (zapasowy)');
+      if (door)            reasons.push('door');
+      if (ctx.motionMain)  reasons.push('motion_main');
+      if (ctx.motionAux)   reasons.push('motion_aux');
       if (reasons.length)  set('triggered', reasons.join(' · '));
       break;
     }
