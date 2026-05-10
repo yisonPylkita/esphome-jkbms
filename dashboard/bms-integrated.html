@@ -536,8 +536,8 @@
       $('battery-nub').className = `battery-nub ${z === 'mid' ? '' : z}`;
     }
 
-    // ---- SOC readout (SVG text) — digits + ghost "88" backplate + dynamic
-    //      % positioning. Zone colour: red < 30, amber mid, green ≥ 70.
+    // ---- SOC readout (SVG text) — digits + ghost "88" backplate.
+    //      Zone colour: red < 20, amber 20-40, cyan 40-70, green ≥ 70.
     let _lastSoc = NaN;
     function updateSocReadout(soc) {
       _lastSoc = soc;
@@ -546,6 +546,25 @@
       const ghost  = $('soc-ghost');
       digits.textContent = v;
       ghost.textContent  = '8'.repeat(v.length);
+      // DSEG7's "1" glyph fills only the right ~⅓ of its character cell —
+      // it has empty advance to the LEFT of the strokes. text-anchor=middle
+      // centres the *advance* box (including that empty space), so any
+      // value with a leading "1" (1, 10..19, 100) reads visually shifted
+      // right of the gauge axis. The geometric correction is the same
+      // regardless of total digit count: the visible-ink centroid is
+      // 0.325 × cell_width to the right of the advance centre, so we
+      // shift by -0.325 × cell_width to bring it on-axis.
+      // (Browsers' getBBox() on <text> returns the advance box, not the
+      // ink box, so we can't measure dynamically — the offset is hardcoded
+      // from the DSEG7 glyph metrics.)
+      const ADVANCE_W = 12.5;       // ≈ DSEG7 cell width at font-size=24 in viewBox units
+      const ONE_INK_FRAC = 0.65;    // empty advance to the LEFT of the "1" stroke (≈ 65% of cell)
+      if (v[0] === '1') {
+        const shift = -ONE_INK_FRAC * ADVANCE_W / 2;
+        digits.setAttribute('transform', `translate(${shift} 0)`);
+      } else {
+        digits.removeAttribute('transform');
+      }
       const z = socZone(soc);
       const colorClass =
           z === 'low'  ? 'soc-red'
@@ -702,7 +721,10 @@
     }
     function demoState(id) {
       const t = Date.now() / 1000;
-      const soc = 50 + 30 * Math.sin(t / 30);
+      // ?soc=N pins SOC to a fixed value (testing visual centering at
+      // edge cases like 1, 11, 100). Default oscillates 20..80.
+      const socOverride = new URLSearchParams(location.search).get('soc');
+      const soc = socOverride !== null ? parseFloat(socOverride) : (50 + 30 * Math.sin(t / 30));
       const v = 53 + Math.sin(t / 40);
       const cur = 8 * Math.sin(t / 8);
       const pwr = cur * v;

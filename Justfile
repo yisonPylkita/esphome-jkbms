@@ -4,6 +4,10 @@
 default:
     @just --list
 
+# Bootstrap a fresh checkout: Python venv + esphome, Node.js binary, secrets.yaml.
+setup:
+    scripts/setup.sh
+
 # Run every repo-level validation gate.
 check:
     scripts/check.sh

@@ -261,6 +261,24 @@
       color: rgba(255, 255, 255, 0.75);
       outline: none;
     }
+
+    /* Build stamp — substituted at deploy time by scripts/deploy-ha.sh.
+       Lets the user verify "the dashboard I'm looking at is exactly what
+       came out of my code editor" by comparing the src hash against
+       `sha256sum dashboard/dashboard.html` locally. */
+    .build-stamp {
+      position: fixed;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      right:  max(14px, env(safe-area-inset-right));
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.20);
+      font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+      pointer-events: none;
+      z-index: 5;
+      user-select: text;
+    }
+    .build-stamp:hover { color: rgba(255, 255, 255, 0.55); }
   </style>
 </head>
 <body id="body">
@@ -342,6 +360,8 @@
   </div>
 
   <a class="toggle-main" href="bms-integrated.html" title="Switch to main dashboard" aria-label="Switch to main dashboard">‹ main</a>
+  <!-- Substituted by scripts/deploy-ha.sh — DO NOT touch by hand. -->
+  <div class="build-stamp" title="Dashboard build identifier (compare against sha256sum dashboard/dashboard.html locally to verify the deploy)">__BUILD_STAMP__</div>
 
   <!-- Pure functions extracted for testability — inlined into the deployed
        HTML by scripts/minify-html.py at deploy time. -->

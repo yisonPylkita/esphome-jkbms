@@ -64,6 +64,16 @@ fi
 SSH="ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new $HA_USER@$HA_HOST"
 SCP="scp -O -q -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
 
+# Portable SHA-256: macOS ships `shasum` (perl-based), Linux ships `sha256sum`
+# (coreutils). Pick whichever is on PATH; both print "<hash>  <file>".
+if command -v sha256sum >/dev/null 2>&1; then
+  sha256() { sha256sum "$@" | /usr/bin/awk '{print $1}'; }
+elif command -v shasum >/dev/null 2>&1; then
+  sha256() { shasum -a 256 "$@" | /usr/bin/awk '{print $1}'; }
+else
+  echo "ERROR: neither sha256sum nor shasum found on PATH" >&2; exit 1
+fi
+
 echo "→ Target: $HA_USER@$HA_HOST  (mode: $MODE)"
 
 # ---- 1. Build dashboards (token substitution + minify + lib/ inline) ----
@@ -72,14 +82,33 @@ trap 'rm -rf "$WORK"' EXIT
 
 MINIFY="$HERE/scripts/minify-html.py"
 DASHBOARD_DIR="$HERE/dashboard"
+
+# Build metadata — baked into the advanced dashboard's `__BUILD_STAMP__`
+# placeholder so you can confirm at a glance which commit / source-file
+# content is currently deployed. Source hash is computed BEFORE any
+# substitutions, so it matches `sha256sum dashboard/dashboard.html` run
+# locally on a clean working tree.
+GIT_BRANCH="$(cd "$HERE" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+GIT_COMMIT="$(cd "$HERE" && git rev-parse --short=8 HEAD 2>/dev/null || echo unknown)"
+if [ -n "$(cd "$HERE" && git status --porcelain 2>/dev/null)" ]; then
+  GIT_DIRTY="+dirty"
+else
+  GIT_DIRTY=""
+fi
+BUILD_TIME="$(date -u +%Y-%m-%dT%H:%MZ)"
+
 declare -a BUILT_PAIRS=()
 for src in "$DASHBOARD_DIR/bms-integrated.html" "$DASHBOARD_DIR/dashboard.html"; do
   name="$(basename "$src")"
   before=$(/usr/bin/wc -c < "$src")
-  /usr/bin/sed "s|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|$HA_TOKEN|" "$src" \
+  src_hash="$(sha256 "$src" | cut -c1-8)"
+  STAMP="${GIT_BRANCH} · ${GIT_COMMIT}${GIT_DIRTY} · src ${src_hash} · ${BUILD_TIME}"
+  /usr/bin/sed -e "s|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|$HA_TOKEN|" \
+               -e "s|__BUILD_STAMP__|${STAMP}|" "$src" \
     | /usr/bin/python3 "$MINIFY" --source-dir "$DASHBOARD_DIR" > "$WORK/$name"
   after=$(/usr/bin/wc -c < "$WORK/$name")
-  printf '   built %-26s %d -> %d bytes (%d%%)\n' "$name" "$before" "$after" $((after * 100 / before))
+  printf '   built %-26s %d -> %d bytes (%d%%)  stamp=%s\n' \
+    "$name" "$before" "$after" $((after * 100 / before)) "$src_hash"
   # Map source name -> deployed remote filename.
   case "$name" in
     bms-integrated.html) remote="/config/www/bms-integrated.html" ;;
@@ -95,7 +124,7 @@ if [ "$MODE" = "dry-run" ]; then
   for pair in "${BUILT_PAIRS[@]}"; do
     local_path="${pair%=*}"
     remote_path="${pair#*=}"
-    local_hash="$(/usr/bin/shasum -a 256 "$local_path" | /usr/bin/awk '{print $1}')"
+    local_hash="$(sha256 "$local_path")"
     remote_hash="$($SSH "sha256sum $remote_path 2>/dev/null | awk '{print \$1}'" 2>/dev/null || echo "<missing>")"
     if [ "$local_hash" = "$remote_hash" ]; then
       printf '   = %-30s (unchanged)\n' "$(basename "$remote_path")"

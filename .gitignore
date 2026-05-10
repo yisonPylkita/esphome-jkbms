@@ -6,6 +6,9 @@ build/
 __pycache__/
 .venv/
 
+# Tooling installed by scripts/setup.sh (Node.js binary, etc.)
+.tools/
+
 # Lighthouse / audit / report artefacts — keep them out of source.
 *.pdf
 

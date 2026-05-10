@@ -45,16 +45,32 @@ That's it — only BLE.
 
 ## Setup
 
-### Prerequisites
+### One-shot bootstrap
 
-- Python 3.10+ in a venv with esphome installed:
-  ```
-  python3 -m venv .venv
-  .venv/bin/pip install esphome
-  ```
-- A Home Assistant instance reachable over the network (LAN or Tailscale).
-  The "SSH & Web Terminal" addon must be enabled, with your local SSH key
-  authorised so `scripts/deploy-ha.sh` can `scp` / `ssh` without a prompt.
+```
+just setup
+```
+
+That single command:
+
+- Creates `.venv/` and installs `esphome` into it.
+- Downloads a self-contained Node.js 20 binary into `.tools/` (used by
+  `just test`). System node is reused if it's already installed and ≥ 18.
+- Copies `secrets.yaml.example` → `secrets.yaml` (if missing) and links
+  `inverter/secrets.yaml` to it.
+- Runs `just check && just test` to validate the bootstrap.
+
+### Prerequisites assumed by `setup.sh`
+
+`git`, `just`, `python3` (≥ 3.10), `curl`, `tar`. macOS (x64 / arm64) and
+Linux (x64 / arm64) are supported. Nothing else needs to be on PATH —
+Node.js, esphome, and any future tooling are downloaded into the repo.
+
+### Home Assistant deploy target
+
+A reachable HA instance (LAN or Tailscale). The "SSH & Web Terminal"
+addon must be enabled, with your local SSH key authorised so
+`scripts/deploy-ha.sh` can `scp` / `ssh` without a prompt.
 
 ### 1. Find the BMS BLE MAC
 

@@ -49,3 +49,12 @@ jobs:
 
       - name: scripts/test.sh
         run: bash scripts/test.sh
+
+      # Exercise deploy-ha.sh's argument parser, sha256 helper, and gating
+      # on Linux without actually touching a remote box. --check-only stops
+      # before any scp/ssh.
+      - name: scripts/deploy-ha.sh --check-only
+        env:
+          HA_HOST: ci-stub
+          HA_TOKEN: ci-stub
+        run: bash scripts/deploy-ha.sh --check-only
