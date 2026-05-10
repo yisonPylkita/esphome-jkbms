@@ -45,6 +45,13 @@ minify:
 deploy: check test
     scripts/deploy-ha.sh
 
+# Disaster-recovery: re-create the HA box from snapshots in this repo.
+# Requires a fresh HA OS install with SSH access + secrets.yaml filled in.
+# Idempotent. Prints "MANUAL STEP" markers for things that can't be
+# automated (Tailscale auth, paired Zigbee state, HA users).
+restore:
+    scripts/restore-ha.sh
+
 # Run deploy through the substitute/minify/hash steps, stop before scp.
 dry-run:
     scripts/deploy-ha.sh --dry-run

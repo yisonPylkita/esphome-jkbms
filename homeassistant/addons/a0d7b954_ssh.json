@@ -1,0 +1,24 @@
+{
+  "slug": "a0d7b954_ssh",
+  "name": "Advanced SSH & Web Terminal",
+  "version": "23.0.9",
+  "repository": "a0d7b954",
+  "options": {
+    "ssh": {
+      "username": "root",
+      "password": "",
+      "authorized_keys": [
+        "ssh-ed25519 AAAA<<REPLACE_WITH_YOUR_PUBLIC_KEY>> user@host"
+      ],
+      "sftp": true,
+      "compatibility_mode": false,
+      "allow_agent_forwarding": false,
+      "allow_remote_port_forwarding": false,
+      "allow_tcp_forwarding": false
+    },
+    "zsh": true,
+    "share_sessions": false,
+    "packages": [],
+    "init_commands": []
+  }
+}

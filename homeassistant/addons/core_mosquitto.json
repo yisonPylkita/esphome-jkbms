@@ -1,0 +1,18 @@
+{
+  "slug": "core_mosquitto",
+  "name": "Mosquitto broker",
+  "version": "7.1.0",
+  "repository": "core",
+  "options": {
+    "logins": [],
+    "log_dest": [],
+    "log_type": [],
+    "require_certificate": false,
+    "certfile": "fullchain.pem",
+    "keyfile": "privkey.pem",
+    "customize": {
+      "active": false,
+      "folder": "mosquitto"
+    }
+  }
+}

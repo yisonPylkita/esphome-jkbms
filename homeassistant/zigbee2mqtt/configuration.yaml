@@ -1,0 +1,31 @@
+version: 5
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://core-mosquitto:1883
+  user: addons
+  password: "<<REPLACE_WITH_MOSQUITTO_PASSWORD>>"
+serial:
+  port: /dev/ttyUSB0
+  baudrate: 115200
+  rtscts: false
+advanced:
+  log_level: info
+  channel: 11
+  network_key: GENERATE # Z2M will mint a new key on first boot; or replace with the one from your coordinator_backup.json (which lives outside this repo for security).
+  pan_id: GENERATE # ditto — Z2M generates one on first boot if absent
+  ext_pan_id: GENERATE # ditto
+frontend:
+  enabled: true
+  port: 8099
+homeassistant:
+  enabled: true
+devices:
+  "0xa4c1383ff292a6de":
+    friendly_name: battery_room_motion_main
+    description: ""
+  "0xa4c1388fb2a89f51":
+    friendly_name: battery_room_siren
+  "0xa4c1389267954032":
+    friendly_name: battery_room_motion_aux
+  "0xa4c13889af0fd9e7":
+    friendly_name: battery_room_door

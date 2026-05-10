@@ -13,7 +13,10 @@ dashboard/*.local.html
 # Auto-managed by Node-RED's editor — we patch this file with surgical
 # Python scripts that keep its JSON shape stable. Letting prettier rewrite
 # every key forces gratuitous diffs on every commit.
-node-red/*.flow.json
+homeassistant/node-red/flows.json
+# Same reason for the addon-options snapshots — supervisor's `info`
+# endpoint emits a fixed shape; reformatting on every commit is noise.
+homeassistant/addons/*.json
 
 # Secrets — keep formatting changes off the file so credentials don't
 # accidentally land in PR diffs.

@@ -221,6 +221,70 @@ Tokens never enter the repo. Each `*.html` template carries the literal
 placeholder `PASTE_LONG_LIVED_ACCESS_TOKEN_HERE`; `scripts/deploy-ha.sh`
 substitutes it at deploy time. `.gitignore` blocks `dashboard/*.local.html`.
 
+## Disaster recovery — bring up a brand-new HA box from this repo
+
+Everything the live HA OS box needs is mirrored under `homeassistant/`,
+sanitised so secrets don't ride along:
+
+```
+homeassistant/
+├── core/
+│   ├── configuration.yaml          /config/configuration.yaml
+│   └── HA_VERSION                  noted as "tested with"
+├── packages/jk_alarm.yaml          (still at homeassistant/alarm-helpers.yaml)
+├── addons/
+│   ├── 5c53de3b_esphome.json       Add-on options snapshot
+│   ├── 45df7312_zigbee2mqtt.json
+│   ├── a0d7b954_nodered.json
+│   ├── a0d7b954_ssh.json
+│   ├── a0d7b954_tailscale.json
+│   ├── cb646a50_get.json           HACS install helper (one-shot)
+│   └── core_mosquitto.json
+├── zigbee2mqtt/
+│   └── configuration.yaml          Z2M config — secrets stripped
+└── node-red/
+    ├── flows.json                  Full flows (server-config IDs blanked)
+    ├── settings.js
+    └── package.json
+```
+
+To restore from scratch:
+
+1. Flash Home Assistant OS to your SBC, complete first-boot.
+2. Install the Advanced SSH & Web Terminal add-on from the community
+   repo, set up an SSH key, **disable Protection mode** (so the addon
+   can reach the Supervisor API).
+3. Clone this repo, run `scripts/setup.sh`, fill in `secrets.yaml`
+   (especially `ha_host`, `ha_user`, `ha_token`).
+4. `just restore` — installs each add-on (or prompts you to add the
+   community repo for ones it can't auto-find), applies every saved
+   options snapshot, pushes the core configuration, Z2M config, and
+   Node-RED flows, then hands off to `just deploy` for the dashboards.
+
+What `just restore` cannot automate (it'll print `▸ MANUAL STEP` lines
+where these come up):
+
+- **Zigbee mesh state.** `coordinator_backup.json` is the only thing
+  that lets you rejoin already-paired devices without re-pairing — and
+  it contains the network key, so it's deliberately kept out of the
+  repo. Back it up out-of-band (e.g. a 1Password attachment); on a
+  fresh box, drop it into `/config/zigbee2mqtt/` before Z2M's first
+  start. Otherwise re-pair every device.
+- **Tailscale auth.** Open the Tailscale add-on web UI; the log prints
+  a one-time login URL.
+- **HA users + long-lived tokens.** Recreate via Settings → People; mint
+  a new long-lived token in the user profile and paste into
+  `secrets.yaml` as `ha_token`.
+- **Mosquitto MQTT user.** Settings → People → Users → create the
+  account whose password Z2M's `configuration.yaml` references.
+- **HACS.** Re-add via Settings → Devices & Services → Add Integration
+  → HACS; sign in with GitHub.
+
+Add-on options are applied via the Supervisor REST API
+(`POST /addons/<slug>/options`). The Supervisor token used for that
+call lives inside the SSH addon's container as `$SUPERVISOR_TOKEN`, so
+you never need to expose it from the box.
+
 ## Licence
 
 Everything authored in this repo is **MIT** (see `LICENSE`). Third-party

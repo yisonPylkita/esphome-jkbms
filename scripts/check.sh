@@ -34,11 +34,12 @@ ok "bash -n on $(/bin/ls -1 scripts/*.sh | /usr/bin/wc -l | /usr/bin/tr -d ' ') 
 /usr/bin/python3 -m py_compile scripts/*.py || fail "python syntax"
 ok "python3 -m py_compile on scripts/*.py"
 
-# 3. JSON validates — every flow / config we ship.
-for f in node-red/*.flow.json; do
+# 3. JSON validates — every flow / addon snapshot we ship.
+JSON_FILES=$(find homeassistant/node-red homeassistant/addons -name '*.json' -type f 2>/dev/null)
+for f in $JSON_FILES; do
   /usr/bin/python3 -c "import json; json.load(open('$f'))" || fail "JSON parse: $f"
 done
-ok "JSON parse on $(/bin/ls -1 node-red/*.flow.json | /usr/bin/wc -l | /usr/bin/tr -d ' ') flow(s)"
+ok "JSON parse on $(printf '%s\n' "$JSON_FILES" | /usr/bin/wc -l | /usr/bin/tr -d ' ') JSON file(s)"
 
 # 4. ESPHome config validates — both YAMLs.
 ESPHOME=""
@@ -124,7 +125,7 @@ ok "minifier round-trip on all dashboards"
 #    byte-equal (modulo whitespace + JSON-string escaping) so a refactor
 #    on one side doesn't silently desync.
 FSM_LIB="dashboard/lib/alarm-fsm.js"
-FSM_FLOW="node-red/battery-room-alarm.flow.json"
+FSM_FLOW="homeassistant/node-red/flows.json"
 if [ -f "$FSM_LIB" ] && [ -f "$FSM_FLOW" ]; then
   /usr/bin/python3 - "$FSM_LIB" "$FSM_FLOW" <<'PY' || fail "alarm-fsm.js drift between lib and flow"
 import json, re, sys, pathlib

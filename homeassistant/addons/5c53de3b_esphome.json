@@ -1,0 +1,9 @@
+{
+  "slug": "5c53de3b_esphome",
+  "name": "ESPHome Device Builder",
+  "version": "2026.4.5",
+  "repository": "5c53de3b",
+  "options": {
+    "use_new_device_builder": false
+  }
+}

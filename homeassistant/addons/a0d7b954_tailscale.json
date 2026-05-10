@@ -1,0 +1,34 @@
+{
+  "slug": "a0d7b954_tailscale",
+  "name": "Tailscale",
+  "version": "0.28.1",
+  "repository": "a0d7b954",
+  "options": {
+    "accept_dns": true,
+    "accept_routes": true,
+    "advertise_exit_node": true,
+    "advertise_connector": true,
+    "advertise_routes": [
+      "local_subnets"
+    ],
+    "always_use_derp": false,
+    "log_level": "info",
+    "login_server": "https://controlplane.tailscale.com",
+    "share_homeassistant": "serve",
+    "share_on_port": "443",
+    "snat_subnet_routes": true,
+    "stateful_filtering": false,
+    "tags": [],
+    "taildrive": {
+      "addons": false,
+      "addon_configs": false,
+      "backup": false,
+      "config": false,
+      "media": false,
+      "share": false,
+      "ssl": false
+    },
+    "taildrop": true,
+    "userspace_networking": true
+  }
+}
