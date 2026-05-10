@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install esphome
+        run: |
+          python -m pip install --upgrade pip
+          pip install esphome
+
+      # secrets.yaml is gitignored — synthesise a minimal stub so esphome
+      # can resolve `!secret` references during `esphome config`. Values
+      # don't need to be real, just present.
+      - name: Provide stub secrets.yaml
+        run: |
+          cat > secrets.yaml <<'EOF'
+          wifi_ssid: "ci-stub"
+          wifi_password: "ci-stub"
+          api_encryption_key: "1234567890123456789012345678901234567890123="
+          ota_password: "ci-stub"
+          ap_password: "ci-stub"
+          bms_mac_address: "AA:BB:CC:DD:EE:FF"
+          easun_api_encryption_key: "1234567890123456789012345678901234567890123="
+          easun_ota_password: "ci-stub"
+          ha_host: "ci-stub"
+          ha_user: "root"
+          ha_token: "ci-stub"
+          EOF
+          ln -sf "$(pwd)/secrets.yaml" inverter/secrets.yaml
+
+      - name: scripts/check.sh
+        run: bash scripts/check.sh
+
+      - name: scripts/test.sh
+        run: bash scripts/test.sh

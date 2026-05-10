@@ -7,12 +7,42 @@
 # environment variables (HA_HOST, HA_USER, HA_TOKEN). secrets.yaml is gitignored;
 # see secrets.yaml.example for the keys.
 #
-# Usage:   scripts/deploy-ha.sh
+# Usage:
+#   scripts/deploy-ha.sh                # full deploy (gated on check + test)
+#   scripts/deploy-ha.sh --check-only   # run check + test, do not deploy
+#   scripts/deploy-ha.sh --dry-run      # substitute, minify, hash, diff vs remote, no scp/ssh writes
+#   scripts/deploy-ha.sh --skip-checks  # full deploy without check/test (rare; for emergencies)
+#
 # Or:      HA_HOST=100.x.x.x HA_TOKEN=eyJ... scripts/deploy-ha.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 SECRETS="$HERE/secrets.yaml"
+
+MODE="deploy"          # deploy | check-only | dry-run
+SKIP_CHECKS="0"
+for arg in "$@"; do
+  case "$arg" in
+    --check-only)  MODE="check-only" ;;
+    --dry-run)     MODE="dry-run" ;;
+    --skip-checks) SKIP_CHECKS="1" ;;
+    -h|--help)
+      /usr/bin/sed -n '2,/^set -/p' "$0" | /usr/bin/sed -n '/^#/p; /^$/q'
+      exit 0 ;;
+    *) echo "unknown arg: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# ---- 0. Always run check + test first, unless explicitly skipped. ----
+if [ "$SKIP_CHECKS" = "0" ]; then
+  bash "$HERE/scripts/check.sh"
+  bash "$HERE/scripts/test.sh"
+fi
+if [ "$MODE" = "check-only" ]; then
+  echo
+  echo "✓ check-only mode — nothing deployed."
+  exit 0
+fi
 
 # Tiny YAML scalar reader — handles `key: "value"` and `key: value`.
 get() {
@@ -34,41 +64,82 @@ fi
 SSH="ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new $HA_USER@$HA_HOST"
 SCP="scp -O -q -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
 
-echo "→ Target: $HA_USER@$HA_HOST"
+echo "→ Target: $HA_USER@$HA_HOST  (mode: $MODE)"
 
-# ---- 1. Dashboards (with token substituted) ----
+# ---- 1. Build dashboards (token substitution + minify + lib/ inline) ----
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 MINIFY="$HERE/scripts/minify-html.py"
-for src in "$HERE/dashboard/bms-integrated.html" "$HERE/dashboard/dashboard.html"; do
+DASHBOARD_DIR="$HERE/dashboard"
+declare -a BUILT_PAIRS=()
+for src in "$DASHBOARD_DIR/bms-integrated.html" "$DASHBOARD_DIR/dashboard.html"; do
   name="$(basename "$src")"
-  # Substitute the HA token, then minify inline <style>/<script> blocks.
-  # Hand-written source stays readable; deploy ships compact bytes.
   before=$(/usr/bin/wc -c < "$src")
   /usr/bin/sed "s|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|$HA_TOKEN|" "$src" \
-    | /usr/bin/python3 "$MINIFY" > "$WORK/$name"
+    | /usr/bin/python3 "$MINIFY" --source-dir "$DASHBOARD_DIR" > "$WORK/$name"
   after=$(/usr/bin/wc -c < "$WORK/$name")
-  printf '   minified %-26s %d -> %d bytes (%d%%)\n' "$name" "$before" "$after" $((after * 100 / before))
+  printf '   built %-26s %d -> %d bytes (%d%%)\n' "$name" "$before" "$after" $((after * 100 / before))
+  # Map source name -> deployed remote filename.
+  case "$name" in
+    bms-integrated.html) remote="/config/www/bms-integrated.html" ;;
+    dashboard.html)      remote="/config/www/bms-dashboard.html"  ;;
+  esac
+  BUILT_PAIRS+=("$WORK/$name=$remote")
 done
 
-echo "→ Pushing dashboards to /config/www/..."
-$SCP "$WORK/bms-integrated.html" "$HA_USER@$HA_HOST:/config/www/bms-integrated.html"
-$SCP "$WORK/dashboard.html"      "$HA_USER@$HA_HOST:/config/www/bms-dashboard.html"
+# ---- 2. Dry-run: hash everything, fetch remote hashes, print diff. ----
+if [ "$MODE" = "dry-run" ]; then
+  echo
+  echo "→ Hashing local builds and fetching remote hashes..."
+  for pair in "${BUILT_PAIRS[@]}"; do
+    local_path="${pair%=*}"
+    remote_path="${pair#*=}"
+    local_hash="$(/usr/bin/shasum -a 256 "$local_path" | /usr/bin/awk '{print $1}')"
+    remote_hash="$($SSH "sha256sum $remote_path 2>/dev/null | awk '{print \$1}'" 2>/dev/null || echo "<missing>")"
+    if [ "$local_hash" = "$remote_hash" ]; then
+      printf '   = %-30s (unchanged)\n' "$(basename "$remote_path")"
+    else
+      printf '   ! %-30s local=%s remote=%s\n' \
+        "$(basename "$remote_path")" "${local_hash:0:12}" "${remote_hash:0:12}"
+    fi
+  done
+  # Font mirror diff.
+  echo
+  echo "→ Font directory diff..."
+  remote_fonts="$($SSH 'ls /config/www/fonts/ 2>/dev/null' || true)"
+  local_fonts="$(cd "$HERE/dashboard/fonts" && /bin/ls)"
+  /usr/bin/diff <(printf '%s\n' "$local_fonts") <(printf '%s\n' "$remote_fonts") \
+    | /usr/bin/sed 's/^/   /' || true
+  # Helpers presence.
+  echo
+  echo "→ Helpers section in remote configuration.yaml..."
+  if $SSH "grep -q 'heater_request' /config/configuration.yaml"; then
+    echo "   = helpers already present (deploy would skip the append)"
+  else
+    echo "   ! helpers MISSING (deploy would append homeassistant/heater-helpers.yaml)"
+  fi
+  echo
+  echo "✓ dry-run complete — nothing was changed on the remote."
+  exit 0
+fi
 
-# ---- 2. Fonts (mirror — remove anything on the box that isn't local) ----
+# ---- 3. Push dashboards. ----
+echo "→ Pushing dashboards to /config/www/..."
+for pair in "${BUILT_PAIRS[@]}"; do
+  local_path="${pair%=*}"
+  remote_path="${pair#*=}"
+  $SCP "$local_path" "$HA_USER@$HA_HOST:$remote_path"
+done
+
+# ---- 4. Fonts (mirror — remove anything on the box that isn't local) ----
 echo "→ Pushing fonts to /config/www/fonts/..."
 $SSH "mkdir -p /config/www/fonts"
-# Push everything we have first.
 $SCP "$HERE/dashboard/fonts/"*.woff2 "$HERE/dashboard/fonts/"*.txt "$HA_USER@$HA_HOST:/config/www/fonts/"
-# Compute a keep-list and prune stragglers so the remote mirrors local.
 LOCAL_LIST="$(cd "$HERE/dashboard/fonts" && ls -1 | tr '\n' '|' | sed 's/|$//')"
 $SSH "cd /config/www/fonts && for f in *; do echo \"\$f\" | grep -qxE '$LOCAL_LIST' || rm -f -- \"\$f\"; done"
 
-# ---- 3. HA helpers (idempotent — keyed on a marker comment) ----
-# Use plain `grep` / `cat` — HA OS ships BusyBox under /bin, not /usr/bin.
-# The marker also matches the manually-named "heater_request" so we don't
-# double-append if helpers were added by hand on an earlier deploy.
+# ---- 5. HA helpers (idempotent — keyed on a marker comment) ----
 MARKER="# === jk-pb-bms helpers (managed by scripts/deploy-ha.sh) ==="
 echo "→ Ensuring HA helpers are present in configuration.yaml..."
 if $SSH "grep -q 'heater_request' /config/configuration.yaml"; then
@@ -79,18 +150,18 @@ else
   echo "  appended"
 fi
 
-# Validate config before reloading.
+# ---- 6. Validate config before reloading. ----
 echo "→ Validating HA config..."
 $SSH "ha core check" >/dev/null
 
-# Reload helper domains (no full restart needed for input_*).
+# ---- 7. Reload helper domains (no full restart needed for input_*). ----
 echo "→ Reloading helper domains..."
 for d in input_boolean input_number input_text; do
   /usr/bin/curl -s -X POST -H "Authorization: Bearer $HA_TOKEN" \
     "http://$HA_HOST:8123/api/services/$d/reload" -o /dev/null -w "  %{http_code} $d\n"
 done
 
-# ---- 4. Verify ----
+# ---- 8. Verify ----
 echo "→ Verifying entities..."
 HEATER_COUNT=$(/usr/bin/curl -s -H "Authorization: Bearer $HA_TOKEN" \
   "http://$HA_HOST:8123/api/states" \

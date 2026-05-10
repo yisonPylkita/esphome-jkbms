@@ -415,6 +415,11 @@
 
   <a class="toggle-adv" href="bms-dashboard.html" title="Switch to advanced dashboard" aria-label="Switch to advanced dashboard">advanced ›</a>
 
+  <!-- Pure functions extracted for testability — inlined into the deployed
+       HTML by scripts/minify-html.py at deploy time. -->
+  <script src="lib/zones.js"></script>
+  <script src="lib/predict.js"></script>
+
   <script>
     // ============================================================
     // CONFIG
@@ -455,23 +460,11 @@
       const a = deg * Math.PI / 180;
       return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
     }
-    // Four-tier SOC banding:
-    //   low  < 20%   red    — critical, stop using
-    //   warn < 40%   amber  — approaching low, plan to recharge
-    //   mid  < 70%   cyan   — normal operating range
-    //   high ≥ 70%   green  — well charged
-    function tickFillColor(t) {
-      if (t < 0.20) return 'var(--bms-red)';
-      if (t < 0.40) return 'var(--bms-amber)';
-      if (t < 0.70) return 'var(--bms-cyan)';
-      return 'var(--bms-green)';
-    }
-    function socZone(soc) {
-      if (soc < 20) return 'low';
-      if (soc < 40) return 'warn';
-      if (soc < 70) return 'mid';
-      return 'high';
-    }
+    // SOC banding helpers (tickFillColor, socZone) live in lib/zones.js;
+    // the runtime prediction helpers (predictLinear, fmtPredictionParts,
+    // roundToGrain, POWER_DEAD_W) live in lib/predict.js. Both are loaded
+    // via the <script src> tags below this inline script and inlined into
+    // the deployed HTML by scripts/minify-html.py.
 
     // ---- Gauge — build the inner ring + 56 ticks once ----
     function buildGauge() {
@@ -583,10 +576,10 @@
       return '';
     }
 
-    // ---- Power readout. Three states: idle (cyan, |W| ≤ 5), charging
-    //      (green, > 5), discharging (red, < -5). Colour is the only
-    //      direction signal — no plus/minus sign.
-    const POWER_DEAD_W = 5;
+    // ---- Power readout. Three states: idle (cyan, |W| ≤ POWER_DEAD_W),
+    //      charging (green), discharging (red). Colour is the only
+    //      direction signal — no plus/minus sign. POWER_DEAD_W is defined
+    //      in lib/predict.js (= 5 W).
     function updatePower(power) {
       const inner = $('power-row-inner');
       const num = $('power-num');
@@ -630,56 +623,15 @@
       return recent.reduce((s, x) => s + x.p, 0) / recent.length;
     }
 
-    // Linear projection. Sustained 1h mean power is treated as the constant
-    // forward rate. Returns when the pack would hit empty (0 %) or full
-    // (100 %) at that rate, whichever direction the average is signed.
-    function predictLinear(socPct, capacityFullWh, avgPowerW) {
-      if (!Number.isFinite(socPct) || !Number.isFinite(capacityFullWh) || capacityFullWh <= 0) return null;
-      if (!Number.isFinite(avgPowerW) || Math.abs(avgPowerW) < POWER_DEAD_W) return null;
-      const energyWh = (socPct / 100) * capacityFullWh;
-      let secs;
-      let kind;
-      if (avgPowerW < 0) {
-        kind = 'empty';
-        secs = (energyWh / Math.abs(avgPowerW)) * 3600;
-      } else {
-        kind = 'full';
-        secs = ((capacityFullWh - energyWh) / avgPowerW) * 3600;
-      }
-      if (!Number.isFinite(secs) || secs <= 0) return null;
-      return { kind, when: new Date(Date.now() + secs * 1000) };
-    }
-
-    // Compact time format for the twin layout: big seg-digits show only the
-    // hh:mm; the day name lives in the small unit suffix beside it.
-    function fmtPredictionParts(d) {
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const dayKey = (x) => Math.floor((new Date(x.getFullYear(), x.getMonth(), x.getDate()) - startOfToday) / 86400000);
-      const k = dayKey(d);
-      const hhmm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      let day;
-      if      (k === 0) day = 'Today';
-      else if (k === 1) day = 'Tomorrow';
-      else if (k <= 6)  day = d.toLocaleDateString([], { weekday: 'short' });
-      else              day = d.toLocaleDateString([], { day: '2-digit', month: 'short' });
-      return { hhmm, day };
-    }
-
     // The 1h-mean rate jitters slightly each second, so the projected hh:mm
     // wobbles ±1 min and the readout becomes flashy. Tame it two ways:
-    //  • Round the displayed minute to a 5-minute grain.
+    //  • Round the displayed minute to a 5-minute grain (roundToGrain in lib/predict.js).
     //  • Throttle DOM updates to one per ~15 s — but force-refresh on
     //    direction change (charging ↔ discharging) so the colour flip
     //    is immediate.
     const PRED_DOM_REFRESH_MS = 15 * 1000;
     const PRED_TIME_GRAIN_MIN = 5;
     let _lastPredOut = { ts: 0, dir: '', kind: '', big: '', sub: '', lbl: '' };
-
-    function roundToGrain(d, grainMin) {
-      const ms = grainMin * 60 * 1000;
-      return new Date(Math.round(d.getTime() / ms) * ms);
-    }
 
     function updatePrediction(soc, capRemAh, capTotAh, voltV, signedPowerW) {
       const cell  = $('prediction-cell');

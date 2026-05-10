@@ -6,8 +6,15 @@ identifiers, drop semicolons, or rewrite expressions, so behaviour is identical
 to the source. Safe for hand-written code with template literals, regex
 literals, etc., as long as no string spans multiple physical lines.
 
-Usage:  python3 minify-html.py < input.html > output.html
+Also inlines `<script src="lib/X.js"></script>` tags by reading the referenced
+file from disk — pure helper functions live as separate testable JS files
+in dashboard/lib/ during development, but the deployed HTML stays self-
+contained (no 404s, no extra round-trips on slow phone connections).
+
+Usage:  python3 minify-html.py [--source-dir DIR] < input.html > output.html
 """
+import argparse
+import os
 import re
 import sys
 
@@ -42,18 +49,46 @@ def minify_js(js: str) -> str:
 
 
 _STYLE_RE = re.compile(r"(<style[^>]*>)(.*?)(</style>)", re.DOTALL)
-_SCRIPT_RE = re.compile(r"(<script[^>]*>)(.*?)(</script>)", re.DOTALL)
+_SCRIPT_INLINE_RE = re.compile(r"(<script(?![^>]*\bsrc=)[^>]*>)(.*?)(</script>)", re.DOTALL)
+_SCRIPT_SRC_RE = re.compile(r"<script[^>]*\bsrc=\"([^\"]+)\"[^>]*>\s*</script>")
 
 
-def minify_html(html: str) -> str:
+def inline_external_scripts(html: str, source_dir: str) -> str:
+    """Replace `<script src="X"></script>` with `<script>...minified contents...</script>`.
+
+    Deployed HTML stays single-file. Source HTML still uses external scripts
+    so editor tooling and Node tests can address them as standalone files.
+    """
+    def replace(match):
+        rel = match.group(1)
+        path = os.path.normpath(os.path.join(source_dir, rel))
+        if not os.path.isfile(path):
+            sys.stderr.write(f"[minify] WARN: <script src=\"{rel}\"> -> {path} not found, leaving as-is\n")
+            return match.group(0)
+        with open(path, "r", encoding="utf-8") as fh:
+            body = fh.read()
+        return f"<script>{minify_js(body)}</script>"
+    return _SCRIPT_SRC_RE.sub(replace, html)
+
+
+def minify_html(html: str, source_dir: str = ".") -> str:
+    # Inline external scripts BEFORE we minify any inline scripts — the
+    # inlined body itself will be minified by the substitution.
+    html = inline_external_scripts(html, source_dir)
     html = _STYLE_RE.sub(
         lambda m: m.group(1) + minify_css(m.group(2)) + m.group(3), html
     )
-    html = _SCRIPT_RE.sub(
+    html = _SCRIPT_INLINE_RE.sub(
         lambda m: m.group(1) + minify_js(m.group(2)) + m.group(3), html
     )
     return html
 
 
 if __name__ == "__main__":
-    sys.stdout.write(minify_html(sys.stdin.read()))
+    p = argparse.ArgumentParser()
+    p.add_argument("--source-dir", default=".",
+                   help="Directory containing the source HTML — used as base "
+                        "for resolving <script src=\"...\"> paths. Defaults "
+                        "to the current working directory.")
+    args = p.parse_args()
+    sys.stdout.write(minify_html(sys.stdin.read(), source_dir=args.source_dir))
