@@ -1,11 +1,17 @@
-# SPDX-License-Identifier: MIT AND Apache-2.0
+# SPDX-License-Identifier: MIT
 # SPDX-FileCopyrightText: 2026 Wojciech Bartnik
-# SPDX-FileCopyrightText: Sebastian Muszynski and contributors to syssi/esphome-jk-bms
 #
 # ESPHome firmware for an ESP32-C3 that bridges a JK BMS to Home Assistant
 # over Bluetooth Low Energy. Read-only — exposes everything the JK02_32S
 # BLE protocol decodes (SOC, voltage, current, power, cell voltages,
 # resistances, temperatures, balancing, errors).
+#
+# The BLE protocol implementation comes from syssi/esphome-jk-bms (Apache
+# 2.0), pulled in as a build-time external component (see `external_
+# components:` below) — ESPHome fetches and compiles it. No source from
+# that project is redistributed in this repo, so this YAML stays plain
+# MIT; the Apache-2.0 license applies to the compiled binary's embedded
+# upstream code, not to anything in this file.
 
 substitutions:
   name: jk-pb-bms

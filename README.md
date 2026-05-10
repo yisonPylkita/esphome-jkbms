@@ -10,22 +10,25 @@ the battery-room intrusion alarm.
 - **`jk-pb-bms.yaml`** — the ESPHome firmware. ESP32-C3 connects to the BMS
   over BLE using the upstream `jk_bms_ble` component (`JK02_32S` protocol)
   and republishes everything to HA via the native API.
-- **`dashboard/bms-integrated.html`** — the **main** dashboard. Half-circle
-  SOC gauge, voltage / max temperature in the corners, twin power +
-  predicted-runtime readout below a 12-cell battery bar. Pitch-black
-  OLED-style design, DSEG7 7-segment digits, pure HTML/CSS/JS, no
-  framework dependencies, font self-hosted.
-- **`dashboard/dashboard.html`** — diagnostic / advanced view. Live entity
-  list, per-cell voltages and resistances, 1h/6h/24h/3d/7d history charts
-  for SOC / current / power / temperature, polling diagnostics, raw JSON.
+- **`dashboard/bms/`** — the **main** dashboard (`index.html` + `style.css` +
+  `app.js`). Half-circle SOC gauge, voltage / max temperature in the
+  corners, twin power + predicted-runtime readout below a 12-cell
+  battery bar. Pitch-black OLED-style design, DSEG7 7-segment digits,
+  pure HTML/CSS/JS, no framework dependencies, font self-hosted. Deploy
+  bundles the folder into a single `/local/bms-integrated.html`.
+- **`dashboard/advanced/`** — diagnostic view. Live entity list, per-cell
+  voltages and resistances, 1h/6h/24h/3d/7d history charts for SOC /
+  current / power / temperature, polling diagnostics, raw JSON. Deploys
+  to `/local/bms-dashboard.html`.
 - **`node-red/battery-room-alarm.flow.json`** — battery-room intrusion
   alarm FSM (`disarmed → arming → armed → triggered`) driven by Zigbee
   motion + door sensors, fires the Zigbee siren and a critical-priority
   push notification on trip.
-- **`dashboard/alarm.html`** — single-purpose alarm dashboard. ARM /
+- **`dashboard/alarm/`** — single-purpose alarm dashboard. ARM /
   DISARM buttons, live sensor readouts, auto-arm toggle, advanced
   settings (quiet timer, grace seconds, siren duration). Reachable from
-  the main BMS dashboard via the `alarm ›` link.
+  the main BMS dashboard via the `alarm ›` link. Deploys to
+  `/local/alarm.html`.
 - **`homeassistant/alarm-helpers.yaml`** — HA helpers (input_boolean /
   input_number / input_select / input_text) consumed by the alarm flow,
   deployed into `/config/packages/jk_alarm.yaml`.
@@ -175,8 +178,11 @@ registered with HA.
 ├── secrets.yaml.example       Required secret keys; copy to secrets.yaml
 ├── secrets.yaml               Real secrets (gitignored)
 ├── dashboard/
-│   ├── bms-integrated.html    Main dashboard
-│   ├── dashboard.html         Diagnostic dashboard
+│   ├── bms/                   Main dashboard (index.html + style.css + app.js)
+│   ├── alarm/                 Alarm dashboard (index.html + style.css + app.js)
+│   ├── advanced/              Diagnostic dashboard (index.html + style.css + app.js)
+│   ├── lib/                   Shared pure-function helpers (i18n, predict, fsm…)
+│   ├── favicon.svg            PWA icon — vertical battery, dashboard palette
 │   └── fonts/                 Self-hosted DSEG7 Modern Bold (OFL 1.1)
 ├── homeassistant/
 │   └── alarm-helpers.yaml     Helpers consumed by the alarm flow
@@ -184,6 +190,9 @@ registered with HA.
 │   └── battery-room-alarm.flow.json   Battery-room alarm FSM
 ├── scripts/
 │   ├── deploy-ha.sh           One-shot HA deploy
+│   ├── fmt.sh                 prettier + ruff format runner
+│   ├── check.sh               Validation gates (run by `just check`)
+│   ├── test.sh                Node test runner
 │   └── minify-html.py         Inline CSS/JS minifier (used by deploy)
 └── inverter/
     └── easun.yaml             Easun inverter firmware (unrelated to BMS)
@@ -214,8 +223,15 @@ substitutes it at deploy time. `.gitignore` blocks `dashboard/*.local.html`.
 
 ## Licence
 
-- Repository configuration: MIT (see `LICENSE`).
-- The `jk_bms_ble` ESPHome component fetched at build time from
-  `syssi/esphome-jk-bms` is Apache-2.0 (see `LICENSES/Apache-2.0.txt`).
-- DSEG7 Modern Bold (`dashboard/fonts/DSEG7Modern-Bold.woff2`) is
-  SIL Open Font License 1.1 (see `dashboard/fonts/DSEG-LICENSE.txt`).
+Everything authored in this repo is **MIT** (see `LICENSE`). Third-party
+dependencies retain their own licenses where required:
+
+- The DSEG7 Modern Bold font (`dashboard/fonts/DSEG7Modern-Bold.woff2`)
+  ships with its own license under the SIL Open Font License 1.1, kept
+  alongside the font file at `dashboard/fonts/DSEG-LICENSE.txt` (OFL §3
+  requires it to travel with the font).
+- The `jk_bms_ble` ESPHome component referenced by
+  `external_components:` in `jk-pb-bms.yaml` is fetched from
+  [`syssi/esphome-jk-bms`](https://github.com/syssi/esphome-jk-bms) at
+  build time. It's Apache-2.0; that license attaches to the binary that
+  ESPHome compiles, not to anything checked in here.
