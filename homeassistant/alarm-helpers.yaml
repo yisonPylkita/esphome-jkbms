@@ -1,0 +1,61 @@
+# Helpers for the battery-room alarm. Driven by node-red/battery-room-alarm.flow.json
+# and rendered by dashboard/alarm.html.
+#
+# Append to /config/configuration.yaml on the HA box. scripts/deploy-ha.sh
+# does this idempotently — keyed off a marker comment so re-runs are safe.
+#
+# Model: `input_select.alarm_state` is the single source of truth for the
+# alarm's state machine. The dashboard's ARM / DISARM buttons just write
+# to this select. The Node-RED FSM also reads & writes it. The
+# `input_boolean.alarm_auto_arm_enabled` is the master toggle for the
+# auto-arming logic (turn off when working in the room).
+
+input_boolean:
+  alarm_auto_arm_enabled:
+    name: Alarm auto-arm enabled
+    icon: mdi:shield-sync
+    initial: true
+
+input_number:
+  alarm_arming_quiet_minutes:
+    name: Alarm arming quiet minutes
+    min: 1
+    max: 30
+    step: 1
+    unit_of_measurement: "min"
+    icon: mdi:timer-sand
+    initial: 5
+  alarm_siren_duration_s:
+    name: Alarm siren duration
+    min: 10
+    max: 600
+    step: 5
+    unit_of_measurement: "s"
+    icon: mdi:bullhorn
+    initial: 60
+  alarm_arming_grace_seconds:
+    name: Alarm arming grace seconds
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: "s"
+    icon: mdi:run-fast
+    initial: 10
+
+input_select:
+  alarm_state:
+    name: Alarm state
+    icon: mdi:state-machine
+    options:
+      - disarmed
+      - arming
+      - armed
+      - triggered
+    initial: disarmed
+
+input_text:
+  alarm_trigger_reason:
+    name: Alarm trigger reason
+    icon: mdi:information
+    initial: ""
+    max: 64

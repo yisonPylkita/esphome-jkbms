@@ -47,29 +47,27 @@ test('predictLinear — at 100% charging or 0% discharging the maths is degenera
   assert.strictEqual(predictLinear(0,   14400, -500, NOW), null);
 });
 
-test('fmtPredictionParts — same calendar day = "Today"', () => {
+test('fmtPredictionParts — same calendar day = "Dziś"', () => {
   const now = new Date('2026-05-10T08:00:00');
   const target = new Date('2026-05-10T22:30:00');
   const parts = fmtPredictionParts(target, now);
-  assert.strictEqual(parts.day, 'Today');
-  // hh:mm formatting depends on locale; just check it has a colon and digits.
+  assert.strictEqual(parts.day, 'Dziś');
   assert.match(parts.hhmm, /\d{1,2}[:.]\d{2}/);
 });
 
-test('fmtPredictionParts — next calendar day = "Tomorrow"', () => {
+test('fmtPredictionParts — next calendar day = "Jutro"', () => {
   const now = new Date('2026-05-10T22:00:00');
   const target = new Date('2026-05-11T07:15:00');
-  assert.strictEqual(fmtPredictionParts(target, now).day, 'Tomorrow');
+  assert.strictEqual(fmtPredictionParts(target, now).day, 'Jutro');
 });
 
-test('fmtPredictionParts — within a week = weekday short', () => {
+test('fmtPredictionParts — within a week = Polish weekday short', () => {
   const now = new Date('2026-05-10T08:00:00');         // Sunday
   const target = new Date('2026-05-13T08:00:00');      // Wednesday
   const day = fmtPredictionParts(target, now).day;
-  // weekday short label varies by locale; assert it's not Today/Tomorrow/date.
-  assert.notStrictEqual(day, 'Today');
-  assert.notStrictEqual(day, 'Tomorrow');
-  assert.ok(day.length > 0 && day.length <= 6);
+  assert.notStrictEqual(day, 'Dziś');
+  assert.notStrictEqual(day, 'Jutro');
+  assert.ok(day.length > 0 && day.length <= 8);        // pl weekday short e.g. "śr."
 });
 
 test('roundToGrain — snaps to nearest N-minute boundary', () => {

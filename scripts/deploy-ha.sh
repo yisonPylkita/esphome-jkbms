@@ -98,7 +98,7 @@ fi
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%MZ)"
 
 declare -a BUILT_PAIRS=()
-for src in "$DASHBOARD_DIR/bms-integrated.html" "$DASHBOARD_DIR/dashboard.html"; do
+for src in "$DASHBOARD_DIR/bms-integrated.html" "$DASHBOARD_DIR/dashboard.html" "$DASHBOARD_DIR/alarm.html"; do
   name="$(basename "$src")"
   before=$(/usr/bin/wc -c < "$src")
   src_hash="$(sha256 "$src" | cut -c1-8)"
@@ -109,10 +109,13 @@ for src in "$DASHBOARD_DIR/bms-integrated.html" "$DASHBOARD_DIR/dashboard.html";
   after=$(/usr/bin/wc -c < "$WORK/$name")
   printf '   built %-26s %d -> %d bytes (%d%%)  stamp=%s\n' \
     "$name" "$before" "$after" $((after * 100 / before)) "$src_hash"
-  # Map source name -> deployed remote filename.
+  # Map source name -> deployed remote filename. We rename `dashboard.html`
+  # to `bms-dashboard.html` on the box; `alarm.html` and `bms-integrated.html`
+  # keep their names.
   case "$name" in
     bms-integrated.html) remote="/config/www/bms-integrated.html" ;;
     dashboard.html)      remote="/config/www/bms-dashboard.html"  ;;
+    alarm.html)          remote="/config/www/alarm.html"          ;;
   esac
   BUILT_PAIRS+=("$WORK/$name=$remote")
 done
@@ -140,14 +143,17 @@ if [ "$MODE" = "dry-run" ]; then
   local_fonts="$(cd "$HERE/dashboard/fonts" && /bin/ls)"
   /usr/bin/diff <(printf '%s\n' "$local_fonts") <(printf '%s\n' "$remote_fonts") \
     | /usr/bin/sed 's/^/   /' || true
-  # Helpers presence.
+  # Helpers presence — packages-style (one file per concern).
   echo
-  echo "→ Helpers section in remote configuration.yaml..."
-  if $SSH "grep -q 'heater_request' /config/configuration.yaml"; then
-    echo "   = helpers already present (deploy would skip the append)"
-  else
-    echo "   ! helpers MISSING (deploy would append homeassistant/heater-helpers.yaml)"
-  fi
+  echo "→ Helper packages on remote..."
+  remote_pkgs="$($SSH 'ls /config/packages/ 2>/dev/null' || true)"
+  for f in jk_alarm.yaml; do
+    if printf '%s\n' "$remote_pkgs" | grep -qx "$f"; then
+      echo "   = $f present"
+    else
+      echo "   ! $f MISSING (deploy would push it)"
+    fi
+  done
   echo
   echo "✓ dry-run complete — nothing was changed on the remote."
   exit 0
@@ -168,16 +174,23 @@ $SCP "$HERE/dashboard/fonts/"*.woff2 "$HERE/dashboard/fonts/"*.txt "$HA_USER@$HA
 LOCAL_LIST="$(cd "$HERE/dashboard/fonts" && ls -1 | tr '\n' '|' | sed 's/|$//')"
 $SSH "cd /config/www/fonts && for f in *; do echo \"\$f\" | grep -qxE '$LOCAL_LIST' || rm -f -- \"\$f\"; done"
 
-# ---- 5. HA helpers (idempotent — keyed on a marker comment) ----
-MARKER="# === jk-pb-bms helpers (managed by scripts/deploy-ha.sh) ==="
-echo "→ Ensuring HA helpers are present in configuration.yaml..."
-if $SSH "grep -q 'heater_request' /config/configuration.yaml"; then
-  echo "  helpers already present, skipping"
+# ---- 5. HA helpers via /config/packages/ (idempotent + clean merging) ----
+# YAML doesn't merge duplicate top-level keys — appending separate
+# `input_boolean:` blocks would silently drop earlier ones. Use HA's
+# `packages` mechanism instead: each helper file lives in /config/packages/
+# and HA merges them per-domain, so multiple helper bundles can coexist
+# without conflict.
+echo "→ Ensuring 'homeassistant.packages' directive in configuration.yaml..."
+if ! $SSH "grep -q 'packages:.*include_dir_named packages' /config/configuration.yaml"; then
+  $SSH "(printf '\nhomeassistant:\n  packages: !include_dir_named packages\n') >> /config/configuration.yaml"
+  echo "  added homeassistant.packages directive"
 else
-  $SCP "$HERE/homeassistant/heater-helpers.yaml" "$HA_USER@$HA_HOST:/tmp/_jk_helpers.yaml"
-  $SSH "(printf '\n%s\n' '$MARKER'; cat /tmp/_jk_helpers.yaml) >> /config/configuration.yaml && rm /tmp/_jk_helpers.yaml"
-  echo "  appended"
+  echo "  directive already present"
 fi
+
+echo "→ Pushing helper packages to /config/packages/..."
+$SSH "mkdir -p /config/packages"
+$SCP "$HERE/homeassistant/alarm-helpers.yaml"  "$HA_USER@$HA_HOST:/config/packages/jk_alarm.yaml"
 
 # ---- 6. Validate config before reloading. ----
 echo "→ Validating HA config..."
@@ -185,22 +198,23 @@ $SSH "ha core check" >/dev/null
 
 # ---- 7. Reload helper domains (no full restart needed for input_*). ----
 echo "→ Reloading helper domains..."
-for d in input_boolean input_number input_text; do
+for d in input_boolean input_number input_text input_select; do
   /usr/bin/curl -s -X POST -H "Authorization: Bearer $HA_TOKEN" \
     "http://$HA_HOST:8123/api/services/$d/reload" -o /dev/null -w "  %{http_code} $d\n"
 done
 
 # ---- 8. Verify ----
-echo "→ Verifying entities..."
-HEATER_COUNT=$(/usr/bin/curl -s -H "Authorization: Bearer $HA_TOKEN" \
+echo "→ Verifying alarm helpers landed..."
+ALARM_COUNT=$(/usr/bin/curl -s -H "Authorization: Bearer $HA_TOKEN" \
   "http://$HA_HOST:8123/api/states" \
-  | /usr/bin/python3 -c "import json,sys; d=json.load(sys.stdin); print(sum(1 for e in d if 'heater' in e['entity_id']))")
-echo "  $HEATER_COUNT heater_* entities present"
+  | /usr/bin/python3 -c "import json,sys; d=json.load(sys.stdin); print(sum(1 for e in d if 'alarm' in e['entity_id']))")
+echo "  $ALARM_COUNT alarm_* entities present"
 
 echo
 echo "✓ Deploy complete. Dashboards at:"
 echo "    http://$HA_HOST:8123/local/bms-integrated.html"
 echo "    http://$HA_HOST:8123/local/bms-dashboard.html"
+echo "    http://$HA_HOST:8123/local/alarm.html"
 echo
-echo "Reminder: import node-red/heater-control.flow.json into Node-RED if"
-echo "this is a fresh HA install."
+echo "Reminder: import node-red/battery-room-alarm.flow.json into Node-RED"
+echo "if this is a fresh HA install."

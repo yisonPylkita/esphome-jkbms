@@ -100,7 +100,52 @@ PY
 done
 ok "minifier round-trip on both dashboards"
 
-# 9. secrets.yaml.example covers every key the deploy script reads.
+# 9. Alarm FSM sync — the Node-RED flow embeds a copy of stepAlarm() so
+#    we can run it inside the function node. Enforce that the two stay
+#    byte-equal (modulo whitespace + JSON-string escaping) so a refactor
+#    on one side doesn't silently desync.
+FSM_LIB="dashboard/lib/alarm-fsm.js"
+FSM_FLOW="node-red/battery-room-alarm.flow.json"
+if [ -f "$FSM_LIB" ] && [ -f "$FSM_FLOW" ]; then
+  /usr/bin/python3 - "$FSM_LIB" "$FSM_FLOW" <<'PY' || fail "alarm-fsm.js drift between lib and flow"
+import json, re, sys, pathlib
+lib = pathlib.Path(sys.argv[1]).read_text()
+flow = json.loads(pathlib.Path(sys.argv[2]).read_text())
+
+def normalise(s):
+    # Drop block comments, line comments, then collapse all whitespace.
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.DOTALL)
+    s = re.sub(r"^\s*//[^\n]*$", "", s, flags=re.MULTILINE)
+    s = re.sub(r"\s+", "", s)
+    return s
+
+m = re.search(r"function stepAlarm\(ctx\) \{(.+?)^\}", lib, re.DOTALL | re.MULTILINE)
+if not m: sys.exit("could not find stepAlarm in lib")
+lib_body = m.group(1)
+
+fn_node = next((n for n in flow if n.get("type") == "function" and n.get("name") == "Alarm FSM"), None)
+if not fn_node: sys.exit("could not find 'Alarm FSM' function node in flow")
+fnsrc = fn_node["func"]
+m2 = re.search(r"// SYNC-START(.+?)// SYNC-END", fnsrc, re.DOTALL)
+if not m2: sys.exit("flow function node missing SYNC-START/SYNC-END markers")
+flow_body_block = m2.group(1)
+m3 = re.search(r"function stepAlarm\(ctx\) \{(.+?)^\}", flow_body_block, re.DOTALL | re.MULTILINE)
+if not m3: sys.exit("could not find stepAlarm in flow")
+flow_body = m3.group(1)
+
+a, b = normalise(lib_body), normalise(flow_body)
+if a != b:
+    # Show first difference for debuggability
+    for i, (x, y) in enumerate(zip(a, b)):
+        if x != y:
+            ctx = 30
+            sys.exit(f"alarm-fsm drift at offset {i}: lib≈{a[max(0,i-ctx):i+ctx]!r} flow≈{b[max(0,i-ctx):i+ctx]!r}")
+    sys.exit(f"alarm-fsm length differs: lib={len(a)} flow={len(b)}")
+PY
+  ok "alarm FSM matches between lib and Node-RED flow"
+fi
+
+# 10. secrets.yaml.example covers every key the deploy script reads.
 NEEDS="ha_host ha_user ha_token wifi_ssid wifi_password api_encryption_key ota_password ap_password bms_mac_address"
 for k in $NEEDS; do
   /usr/bin/grep -qE "^${k}:" secrets.yaml.example || fail "secrets.yaml.example missing key: $k"

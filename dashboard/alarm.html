@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Alarm" />
+  <meta name="theme-color" content="#000000" />
+  <title>Alarm akumulatorów</title>
+  <style>
+    :root {
+      --bg:        #000000;
+      --fg:        #e7e7e7;
+      --fg-dim:    rgba(255, 255, 255, 0.55);
+      --fg-muted:  rgba(255, 255, 255, 0.35);
+      --fg-faint:  rgba(255, 255, 255, 0.12);
+      --rule:      rgba(255, 255, 255, 0.07);
+      --bms-cyan:  #38c8ff;
+      --bms-red:   #ff2e3d;
+      --bms-green: #1bff7c;
+      --bms-amber: #ffb200;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      min-height: 100%;
+      background: var(--bg); color: var(--fg);
+      font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+      font-size: 14px; line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-left)) max(96px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-right)); }
+
+    /* Big state hero */
+    .state-hero {
+      text-align: center;
+      padding: clamp(36px, 12dvh, 80px) 0 clamp(28px, 8dvh, 56px);
+    }
+    .state-label {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+      margin-bottom: 18px;
+    }
+    .state-name {
+      font-size: clamp(40px, 9dvh, 80px);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    .state-name.disarmed  { color: var(--fg); }
+    .state-name.arming    { color: var(--bms-amber); }
+    .state-name.armed     { color: var(--bms-green); }
+    .state-name.triggered { color: var(--bms-red); animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .state-detail {
+      margin-top: 18px;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: var(--fg-dim);
+      min-height: 20px;
+    }
+
+    /* Action button */
+    .actions {
+      display: flex; gap: 14px; justify-content: center;
+      padding: 0 0 28px;
+    }
+    .btn {
+      flex: 1 1 0;
+      max-width: 280px;
+      min-height: 56px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--rule);
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .btn:hover, .btn:focus-visible { background: rgba(255,255,255,0.10); outline: none; }
+    .btn:active { background: rgba(255,255,255,0.16); }
+    .btn.primary { background: rgba(27,255,124,0.08); border-color: rgba(27,255,124,0.40); color: var(--bms-green); }
+    .btn.primary:hover { background: rgba(27,255,124,0.18); }
+    .btn.danger  { background: rgba(255,46,61,0.08); border-color: rgba(255,46,61,0.40); color: var(--bms-red); }
+    .btn.danger:hover { background: rgba(255,46,61,0.18); }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* Sensor live row */
+    .sensors {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+      padding: 18px 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+    }
+    .sensor {
+      text-align: center;
+      padding: 10px 8px;
+    }
+    .sensor .lbl {
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+      margin-bottom: 6px;
+    }
+    .sensor .v {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    .sensor.alert .v { color: var(--bms-red); }
+    .sensor.idle  .v { color: var(--fg-dim); }
+
+    /* Auto-arm toggle row */
+    .row-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .row-toggle .lbl { color: var(--fg-dim); }
+    .row-toggle .hint { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+
+    /* Switch */
+    .switch {
+      width: 44px; height: 24px; border-radius: 12px;
+      background: var(--fg-faint); position: relative;
+      cursor: pointer; transition: background 0.15s ease;
+    }
+    .switch::after {
+      content: ""; position: absolute;
+      top: 2px; left: 2px; width: 20px; height: 20px;
+      border-radius: 50%; background: var(--fg);
+      transition: transform 0.15s ease;
+    }
+    .switch.on { background: rgba(27,255,124,0.50); }
+    .switch.on::after { transform: translateX(20px); }
+
+    /* Advanced section (collapsible) */
+    details.advanced { margin-top: 24px; }
+    details.advanced summary {
+      cursor: pointer; padding: 12px 0;
+      color: var(--fg-muted);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      list-style: none;
+      border-top: 1px solid var(--rule);
+    }
+    details.advanced summary::before { content: "› "; }
+    details.advanced[open] summary::before { content: "⌄ "; }
+    details.advanced .knob {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    details.advanced .knob .name { color: var(--fg-dim); }
+    details.advanced .knob .desc { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+    details.advanced .knob input[type="number"] {
+      width: 90px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--rule);
+      color: var(--fg);
+      font-family: inherit; font-size: 13px; text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Toggle to main view */
+    .toggle-main {
+      position: fixed;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      left:   max(14px, env(safe-area-inset-left));
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.35);
+      text-decoration: none;
+      padding: 4px 6px;
+      z-index: 20;
+    }
+    .toggle-main:hover, .toggle-main:focus-visible {
+      color: rgba(255, 255, 255, 0.75); outline: none;
+    }
+
+    /* Build stamp — substituted at deploy time. */
+    .build-stamp {
+      position: fixed;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      right:  max(14px, env(safe-area-inset-right));
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.20);
+      pointer-events: none;
+      z-index: 5;
+      user-select: text;
+    }
+    .build-stamp:hover { color: rgba(255, 255, 255, 0.55); }
+
+    /* Stale overlay */
+    .stale {
+      position: fixed; top: max(12px, env(safe-area-inset-top));
+      left: 50%; transform: translateX(-50%);
+      padding: 8px 12px;
+      background: rgba(255, 46, 61, 0.18);
+      border: 1px solid var(--bms-red);
+      color: var(--bms-red);
+      font-size: 11px; letter-spacing: 0.10em;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 100;
+    }
+    .stale.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="stale" id="stale">HA — BRAK POŁĄCZENIA</div>
+
+  <main>
+    <div class="state-hero">
+      <div class="state-label">pomieszczenie akumulatorów</div>
+      <div class="state-name disarmed" id="state-name">ROZBROJONY</div>
+      <div class="state-detail" id="state-detail">&nbsp;</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="btn-arm">UZBRÓJ</button>
+      <button class="btn danger" id="btn-disarm">ROZBRÓJ</button>
+    </div>
+
+    <div class="sensors">
+      <div class="sensor" id="sensor-door"><div class="lbl">drzwi</div><div class="v">--</div></div>
+      <div class="sensor" id="sensor-motion-main"><div class="lbl">ruch (główny)</div><div class="v">--</div></div>
+      <div class="sensor" id="sensor-motion-aux"><div class="lbl">ruch (zapasowy)</div><div class="v">--</div></div>
+      <div class="sensor" id="sensor-siren"><div class="lbl">syrena</div><div class="v">--</div></div>
+    </div>
+
+    <div class="row-toggle">
+      <div>
+        <div class="lbl">auto-uzbrajanie</div>
+        <div class="hint">wyłącz, gdy pracujesz w pomieszczeniu</div>
+      </div>
+      <div class="switch" id="switch-autoarm" role="switch" tabindex="0" aria-label="auto-uzbrajanie włączone"></div>
+    </div>
+
+    <details class="advanced">
+      <summary>ustawienia zaawansowane</summary>
+      <div class="knob">
+        <div>
+          <div class="name">czas ciszy do uzbrojenia (min)</div>
+          <div class="desc">ile minut zamkniętych drzwi i braku ruchu jest wymagane przed auto-uzbrojeniem</div>
+        </div>
+        <input type="number" id="cfg-quiet-min" min="1" max="30" step="1">
+      </div>
+      <div class="knob">
+        <div>
+          <div class="name">karencja po uzbrojeniu (s)</div>
+          <div class="desc">ile sekund po uzbrojeniu czujniki są ignorowane (czas na opuszczenie pomieszczenia)</div>
+        </div>
+        <input type="number" id="cfg-grace-sec" min="0" max="60" step="1">
+      </div>
+      <div class="knob">
+        <div>
+          <div class="name">czas trwania syreny (s)</div>
+          <div class="desc">jak długo dzwoni syrena po wyzwoleniu; stan alarmu pozostaje aktywny aż do rozbrojenia</div>
+        </div>
+        <input type="number" id="cfg-siren-sec" min="10" max="600" step="5">
+      </div>
+    </details>
+  </main>
+
+  <a class="toggle-main" href="bms-integrated.html" title="Wróć do panelu głównego" aria-label="Wróć do panelu głównego">‹ główny</a>
+  <div class="build-stamp" title="Identyfikator wersji panelu (porównaj z `sha256sum dashboard/alarm.html` lokalnie, aby zweryfikować wdrożenie)">__BUILD_STAMP__</div>
+
+  <script>
+    const HA_URL = '';
+    const TOKEN  = 'PASTE_LONG_LIVED_ACCESS_TOKEN_HERE';
+    const POLL_MS = 1000;
+
+    const E = {
+      state:           'input_select.alarm_state',
+      autoArm:         'input_boolean.alarm_auto_arm_enabled',
+      quietMin:        'input_number.alarm_arming_quiet_minutes',
+      graceSec:        'input_number.alarm_arming_grace_seconds',
+      sirenSec:        'input_number.alarm_siren_duration_s',
+      reason:          'input_text.alarm_trigger_reason',
+      door:            'binary_sensor.battery_room_door_contact',
+      motionMain:      'binary_sensor.battery_room_motion_main_occupancy',
+      motionAux:       'binary_sensor.battery_room_motion_aux_occupancy',
+      siren:           'siren.battery_room_siren',
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    async function getState(id) {
+      const r = await fetch(`${HA_URL}/api/states/${id}`, {
+        headers: { 'Authorization': 'Bearer ' + TOKEN }, cache: 'no-store',
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }
+    async function callService(domain, service, data) {
+      const r = await fetch(`${HA_URL}/api/services/${domain}/${service}`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+    }
+
+    // ---- Actions ----
+    $('btn-arm').onclick    = () => callService('input_select', 'select_option', { entity_id: E.state, option: 'arming' });
+    $('btn-disarm').onclick = () => callService('input_select', 'select_option', { entity_id: E.state, option: 'disarmed' });
+    $('switch-autoarm').onclick = (e) => {
+      const isOn = e.currentTarget.classList.contains('on');
+      callService('input_boolean', isOn ? 'turn_off' : 'turn_on', { entity_id: E.autoArm });
+    };
+
+    // Bind advanced inputs — write on change.
+    function bindNumber(inputId, entity) {
+      const el = $(inputId);
+      el.addEventListener('change', () => {
+        const v = parseFloat(el.value);
+        if (Number.isFinite(v)) callService('input_number', 'set_value', { entity_id: entity, value: v });
+      });
+    }
+    bindNumber('cfg-quiet-min', E.quietMin);
+    bindNumber('cfg-grace-sec', E.graceSec);
+    bindNumber('cfg-siren-sec', E.sirenSec);
+
+    // ---- Render ----
+    function fmtElapsed(ms) {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      const m = Math.floor(s / 60), sec = s % 60;
+      return m > 0 ? `${m}m ${String(sec).padStart(2, '0')}s` : `${sec}s`;
+    }
+    function setSensor(elId, alertCondition, label) {
+      const el = $(elId);
+      el.classList.toggle('alert', alertCondition);
+      el.classList.toggle('idle',  !alertCondition);
+      el.querySelector('.v').textContent = label;
+    }
+
+    let _lastEditTs = {};      // throttle: don't overwrite while user is editing
+    function safeSetInput(elId, value) {
+      const el = $(elId);
+      if (document.activeElement === el) return;     // user is editing, skip
+      if (Date.now() - (_lastEditTs[elId] || 0) < 1500) return;
+      el.value = value;
+    }
+    for (const id of ['cfg-quiet-min', 'cfg-grace-sec', 'cfg-siren-sec']) {
+      $(id).addEventListener('input', () => { _lastEditTs[id] = Date.now(); });
+    }
+
+    async function tick() {
+      try {
+        const [st, autoArm, quiet, grace, siren, reason, door, mMain, mAux, sirenE] = await Promise.all([
+          getState(E.state), getState(E.autoArm),
+          getState(E.quietMin), getState(E.graceSec), getState(E.sirenSec),
+          getState(E.reason).catch(() => null),
+          getState(E.door).catch(() => null),
+          getState(E.motionMain).catch(() => null),
+          getState(E.motionAux).catch(() => null),
+          getState(E.siren).catch(() => null),
+        ]);
+        $('stale').classList.remove('visible');
+
+        // Hero — internal state names (disarmed/arming/armed/triggered) stay
+        // English in HA so the FSM and other consumers don't have to deal
+        // with localised strings; we map to Polish only on display here.
+        const STATE_PL = {
+          disarmed:  'ROZBROJONY',
+          arming:    'UZBRAJANIE',
+          armed:     'UZBROJONY',
+          triggered: 'ALARM',
+        };
+        const stateVal = st.state;
+        const stateName = $('state-name');
+        stateName.className = 'state-name ' + stateVal;
+        stateName.textContent = STATE_PL[stateVal] || stateVal.toUpperCase();
+
+        // State detail line
+        const detail = $('state-detail');
+        const stateSinceMs = new Date(st.last_changed || st.last_updated).getTime();
+        const elapsedMs = Date.now() - stateSinceMs;
+        let detailText = '';
+        if (stateVal === 'arming') {
+          const targetMs = parseFloat(quiet.state) * 60 * 1000;
+          const remaining = Math.max(0, targetMs - elapsedMs);
+          detailText = `uzbrojenie za ${fmtElapsed(remaining)} — musi panować cisza`;
+        } else if (stateVal === 'armed') {
+          detailText = `uzbrojony od ${fmtElapsed(elapsedMs)}`;
+        } else if (stateVal === 'triggered') {
+          const r = (reason && reason.state) || '?';
+          detailText = `${r} · ${fmtElapsed(elapsedMs)} temu`;
+        } else {
+          detailText = ' ';                     // nbsp keeps height
+        }
+        detail.textContent = detailText;
+
+        // Buttons: only enable what's relevant
+        $('btn-arm').disabled    = (stateVal !== 'disarmed');
+        $('btn-disarm').disabled = (stateVal === 'disarmed');
+
+        // Auto-arm switch
+        $('switch-autoarm').classList.toggle('on', autoArm.state === 'on');
+
+        // Sensors
+        setSensor('sensor-door',        door  && door.state  === 'on', door  ? (door.state  === 'on' ? 'OTWARTE' : 'zamknięte') : '--');
+        setSensor('sensor-motion-main', mMain && mMain.state === 'on', mMain ? (mMain.state === 'on' ? 'RUCH'    : 'cisza')     : '--');
+        setSensor('sensor-motion-aux',  mAux  && mAux.state  === 'on', mAux  ? (mAux.state  === 'on' ? 'RUCH'    : 'cisza')     : '--');
+        setSensor('sensor-siren',       sirenE && sirenE.state === 'on', sirenE ? (sirenE.state === 'on' ? 'DZWONI' : 'spoczynek') : '--');
+
+        // Advanced inputs
+        safeSetInput('cfg-quiet-min', parseFloat(quiet.state));
+        safeSetInput('cfg-grace-sec', parseFloat(grace.state));
+        safeSetInput('cfg-siren-sec', parseFloat(siren.state));
+      } catch (e) {
+        console.warn(e);
+        $('stale').classList.add('visible');
+      }
+    }
+
+    tick();
+    setInterval(tick, POLL_MS);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches?.('input, textarea, select')) return;
+      if (e.key === 'a' || e.key === 'A') location.href = 'bms-integrated.html';
+    });
+  </script>
+
+</body>
+</html>

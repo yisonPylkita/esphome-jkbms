@@ -1,9 +1,9 @@
 # JK BMS over Bluetooth → Home Assistant
 
 ESPHome firmware for an ESP32-C3 that bridges a JK BMS (PB-series, 16-cell
-LFP) over Bluetooth Low Energy to Home Assistant, plus two web dashboards
-served from HA, plus a Node-RED flow that drives a solar-surplus heater
-from the BMS feed.
+LFP) over Bluetooth Low Energy to Home Assistant, plus three web dashboards
+served from HA (main / advanced / alarm), plus a Node-RED flow that runs
+the battery-room intrusion alarm.
 
 ## What this is
 
@@ -18,13 +18,17 @@ from the BMS feed.
 - **`dashboard/dashboard.html`** — diagnostic / advanced view. Live entity
   list, per-cell voltages and resistances, 1h/6h/24h/3d/7d history charts
   for SOC / current / power / temperature, polling diagnostics, raw JSON.
-- **`node-red/heater-control.flow.json`** — solar-surplus heater FSM
-  (`idle → probe → run → backoff`) driven by BMS charging / discharging
-  state, sun elevation, and tunable thresholds. Imports into Node-RED.
-- **`homeassistant/heater-helpers.yaml`** — `input_boolean` /
-  `input_number` / `input_text` helpers consumed by the Node-RED flow,
-  appended to `/config/configuration.yaml` automatically by the deploy
-  script on first run.
+- **`node-red/battery-room-alarm.flow.json`** — battery-room intrusion
+  alarm FSM (`disarmed → arming → armed → triggered`) driven by Zigbee
+  motion + door sensors, fires the Zigbee siren and a critical-priority
+  push notification on trip.
+- **`dashboard/alarm.html`** — single-purpose alarm dashboard. ARM /
+  DISARM buttons, live sensor readouts, auto-arm toggle, advanced
+  settings (quiet timer, grace seconds, siren duration). Reachable from
+  the main BMS dashboard via the `alarm ›` link.
+- **`homeassistant/alarm-helpers.yaml`** — HA helpers (input_boolean /
+  input_number / input_select / input_text) consumed by the alarm flow,
+  deployed into `/config/packages/jk_alarm.yaml`.
 - **`scripts/deploy-ha.sh`** — one-shot deploy / re-deploy to a Home
   Assistant box (substitutes the API token, mirrors fonts, idempotently
   installs helpers, reloads helper domains, runs `ha core check`).
@@ -127,9 +131,9 @@ The script:
    and `scp`s them to `/config/www/`.
 3. Mirrors `dashboard/fonts/` to `/config/www/fonts/` (DSEG7 Modern Bold
    self-hosted; no external font CDN at runtime).
-4. Idempotently appends `homeassistant/heater-helpers.yaml` to
-   `/config/configuration.yaml` (keyed off a marker comment so re-runs
-   are safe).
+4. Pushes `homeassistant/alarm-helpers.yaml` to
+   `/config/packages/jk_alarm.yaml` (HA's `packages:` mechanism merges
+   the helpers per-domain, idempotent across re-runs).
 5. Runs `ha core check` and reloads `input_boolean` / `input_number` /
    `input_text` domains via the HA REST API.
 
@@ -142,20 +146,26 @@ URLs once deployed:
 
 Press **A** on either page to swap to the other.
 
-### 6. Node-RED heater control (optional)
+### 6. Node-RED alarm flow (optional)
 
-The flow drives `input_boolean.heater_request` based on BMS state, sun
-elevation, and tunable thresholds. Once the helpers exist (after step 5):
+`node-red/battery-room-alarm.flow.json` is the battery-room alarm FSM.
+It reads the door + 2 motion sensors, writes `input_select.alarm_state`,
+publishes siren start/stop over MQTT, and pushes a critical-priority
+alert to every `notify.*` target on a trip.
+
+To import:
 
 1. Open Node-RED in HA → hamburger menu → Import → paste the contents of
-   `node-red/heater-control.flow.json` → Import.
+   the flow JSON → Import.
 2. Each HA node will show "missing config" — open one, pick your existing
    Home Assistant server in the Server dropdown, save. NR auto-applies
    it to the rest.
 3. Deploy.
 
-The heater output is `input_boolean.heater_request`. Wire your real relay
-behind a normal HA automation that follows it.
+The MQTT publishes use HA's `mqtt.publish` service (no separate broker
+config in Node-RED needed). The push notification node calls
+`notify.notify`, which broadcasts to every mobile_app integration
+registered with HA.
 
 ## Project layout
 
@@ -169,9 +179,9 @@ behind a normal HA automation that follows it.
 │   ├── dashboard.html         Diagnostic dashboard
 │   └── fonts/                 Self-hosted DSEG7 Modern Bold (OFL 1.1)
 ├── homeassistant/
-│   └── heater-helpers.yaml    Helpers consumed by the Node-RED flow
+│   └── alarm-helpers.yaml     Helpers consumed by the alarm flow
 ├── node-red/
-│   └── heater-control.flow.json   Solar-surplus heater FSM
+│   └── battery-room-alarm.flow.json   Battery-room alarm FSM
 ├── scripts/
 │   ├── deploy-ha.sh           One-shot HA deploy
 │   └── minify-html.py         Inline CSS/JS minifier (used by deploy)

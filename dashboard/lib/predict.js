@@ -35,12 +35,12 @@ function fmtPredictionParts(d, now = new Date()) {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dayKey = (x) => Math.floor((new Date(x.getFullYear(), x.getMonth(), x.getDate()) - startOfToday) / 86400000);
   const k = dayKey(d);
-  const hhmm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const hhmm = d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
   let day;
-  if      (k === 0) day = 'Today';
-  else if (k === 1) day = 'Tomorrow';
-  else if (k <= 6)  day = d.toLocaleDateString([], { weekday: 'short' });
-  else              day = d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+  if      (k === 0) day = 'Dziś';
+  else if (k === 1) day = 'Jutro';
+  else if (k <= 6)  day = d.toLocaleDateString('pl-PL', { weekday: 'short' });
+  else              day = d.toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' });
   return { hhmm, day };
 }
 
