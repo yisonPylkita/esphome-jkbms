@@ -19,13 +19,14 @@ test:
 # What CI runs: check + test, in order.
 ci: check test
 
-# Render minified copies of both dashboards into /tmp for inspection.
+# Render minified copies of all three dashboards into /tmp for inspection.
 minify:
     @mkdir -p /tmp/jkbms-minify
-    @for src in dashboard/bms-integrated.html dashboard/dashboard.html; do \
-        out="/tmp/jkbms-minify/$$(basename $$src)"; \
+    @for folder in bms alarm advanced; do \
+        src="dashboard/$$folder/index.html"; \
+        out="/tmp/jkbms-minify/$$folder.html"; \
         sed 's|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|test-token|' "$$src" \
-          | python3 scripts/minify-html.py --source-dir dashboard > "$$out"; \
+          | python3 scripts/minify-html.py --source-dir "dashboard/$$folder" > "$$out"; \
         printf '  %-30s -> %s (%d bytes)\n' "$$src" "$$out" "$$(wc -c < $$out)"; \
     done
 

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Alarm" />
+  <meta name="theme-color" content="#000000" />
+  <title data-i18n="alarm.docTitle">Alarm akumulatorów</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <link rel="apple-touch-icon" href="../favicon.svg" />
+  
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="stale" id="stale" data-i18n="alarm.haStale">HA — BRAK POŁĄCZENIA</div>
+
+  <main>
+    <div class="state-hero">
+      <div class="state-label" data-i18n="alarm.location">pomieszczenie akumulatorów</div>
+      <div class="state-name disarmed" id="state-name">ROZBROJONY</div>
+      <div class="state-detail" id="state-detail">&nbsp;</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="btn-arm" data-i18n="alarm.btnArm">UZBRÓJ</button>
+      <button class="btn danger" id="btn-disarm" data-i18n="alarm.btnDisarm">ROZBRÓJ</button>
+    </div>
+
+    <div class="sensors">
+      <div class="sensor" id="sensor-door"><div class="lbl" data-i18n="alarm.sensor.door">drzwi</div><div class="v">--</div></div>
+      <div class="sensor" id="sensor-motion-main"><div class="lbl" data-i18n="alarm.sensor.motionMain">ruch (główny)</div><div class="v">--</div></div>
+      <div class="sensor" id="sensor-motion-aux"><div class="lbl" data-i18n="alarm.sensor.motionAux">ruch (zapasowy)</div><div class="v">--</div></div>
+      <div class="sensor" id="sensor-siren"><div class="lbl" data-i18n="alarm.sensor.siren">syrena</div><div class="v">--</div></div>
+    </div>
+
+    <div class="row-toggle">
+      <div>
+        <div class="lbl" data-i18n="alarm.autoarm.label">auto-uzbrajanie</div>
+        <div class="hint" data-i18n="alarm.autoarm.hint">wyłącz, gdy pracujesz w pomieszczeniu</div>
+      </div>
+      <div class="switch" id="switch-autoarm" role="switch" tabindex="0" data-i18n-aria="alarm.autoarm.aria" aria-label="auto-uzbrajanie włączone"></div>
+    </div>
+
+    <details class="advanced">
+      <summary data-i18n="alarm.adv.summary">ustawienia zaawansowane</summary>
+      <div class="knob">
+        <div>
+          <div class="name" data-i18n="alarm.adv.quiet.name">czas ciszy do uzbrojenia (min)</div>
+          <div class="desc" data-i18n="alarm.adv.quiet.desc">ile minut zamkniętych drzwi i braku ruchu jest wymagane przed auto-uzbrojeniem</div>
+        </div>
+        <input type="number" id="cfg-quiet-min" min="1" max="30" step="1">
+      </div>
+      <div class="knob">
+        <div>
+          <div class="name" data-i18n="alarm.adv.grace.name">karencja po uzbrojeniu (s)</div>
+          <div class="desc" data-i18n="alarm.adv.grace.desc">ile sekund po uzbrojeniu czujniki są ignorowane (czas na opuszczenie pomieszczenia)</div>
+        </div>
+        <input type="number" id="cfg-grace-sec" min="0" max="60" step="1">
+      </div>
+      <div class="knob">
+        <div>
+          <div class="name" data-i18n="alarm.adv.siren.name">czas trwania syreny (s)</div>
+          <div class="desc" data-i18n="alarm.adv.siren.desc">jak długo dzwoni syrena po wyzwoleniu; stan alarmu pozostaje aktywny aż do rozbrojenia</div>
+        </div>
+        <input type="number" id="cfg-siren-sec" min="10" max="600" step="5">
+      </div>
+    </details>
+  </main>
+
+  <a class="toggle-main" href="../bms-integrated.html"
+     data-i18n="alarm.toggle.main.text"
+     data-i18n-title="alarm.toggle.main.title"
+     data-i18n-aria="alarm.toggle.main.title"
+     title="Wróć do panelu głównego" aria-label="Wróć do panelu głównego">‹ główny</a>
+  <div class="build-stamp" title="Identyfikator wersji panelu (porównaj z `sha256sum dashboard/alarm.html` lokalnie, aby zweryfikować wdrożenie)">__BUILD_STAMP__</div>
+
+  <script src="../lib/i18n.js"></script>
+  
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>BMS · diagnostic</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <link rel="apple-touch-icon" href="../favicon.svg" />
+  
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body id="body">
+
+  <!-- Sticky summary strip — always-visible glance row at the top.
+       Updates every poll from the same fetch the body sections use. -->
+  <div class="strip" id="strip">
+    <div class="cell"><span class="lbl">soc</span><span class="val" id="s-soc">--</span></div>
+    <div class="cell"><span class="lbl">voltage</span><span class="val" id="s-volt">--</span></div>
+    <div class="cell"><span class="lbl">power</span><span class="val" id="s-power">--</span></div>
+    <div class="cell"><span class="lbl">current</span><span class="val" id="s-cur">--</span></div>
+    <div class="cell"><span class="lbl">temp avg</span><span class="val" id="s-temp">--</span></div>
+    <div class="cell"><span class="lbl">link</span><span class="val" id="s-link">--</span></div>
+    <div class="cell"><span class="lbl">uptime</span><span class="val" id="s-up">--</span></div>
+  </div>
+
+  <!-- Advanced / diagnostic view — the only view in this file. Main page
+       (the customer-facing UI) lives in bms-integrated.html. -->
+  <div class="adv" id="view-advanced" lang="en">
+    <h2>Connection</h2>
+    <div id="conn"></div>
+
+    <h2>Battery</h2>
+    <div id="live"></div>
+
+    <h2>Cells (16S)</h2>
+    <div class="cells-grid" id="cells"></div>
+
+    <h2>Temperatures</h2>
+    <div id="temps"></div>
+
+    <h2>History</h2>
+    <div class="chart-controls" id="range-buttons">
+      <button data-h="1">1h</button>
+      <button data-h="6">6h</button>
+      <button data-h="24" class="active">24h</button>
+      <button data-h="72">3d</button>
+      <button data-h="168">7d</button>
+    </div>
+    <div class="charts">
+      <div class="chart-row">
+        <div class="chart-label">SOC %</div>
+        <canvas class="chart" id="chart-soc"></canvas>
+        <div class="chart-cur" id="chart-soc-cur">--</div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-label">Current A</div>
+        <canvas class="chart" id="chart-current"></canvas>
+        <div class="chart-cur" id="chart-current-cur">--</div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-label">Power W</div>
+        <canvas class="chart" id="chart-power"></canvas>
+        <div class="chart-cur" id="chart-power-cur">--</div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-label">Temp °C</div>
+        <canvas class="chart" id="chart-temp"></canvas>
+        <div class="chart-cur" id="chart-temp-cur">--</div>
+      </div>
+    </div>
+    <div class="chart-meta" id="chart-meta">--</div>
+
+    <h2>Change stream</h2>
+    <div class="feed" id="feed"></div>
+
+    <h2>Polling</h2>
+    <div id="poll"></div>
+
+    <details>
+      <summary>Raw JSON of all entities</summary>
+      <pre class="raw" id="raw">--</pre>
+    </details>
+
+    <details>
+      <summary>Client config</summary>
+      <pre class="raw" id="cfg">--</pre>
+    </details>
+  </div>
+
+  <a class="toggle-main" href="../bms-integrated.html" title="Switch to main dashboard" aria-label="Switch to main dashboard">‹ main</a>
+  <!-- Substituted by scripts/deploy-ha.sh — DO NOT touch by hand. -->
+  <div class="build-stamp" title="Dashboard build identifier (compare against sha256sum dashboard/dashboard.html locally to verify the deploy)">__BUILD_STAMP__</div>
+
+  <!-- Pure functions extracted for testability — inlined into the deployed
+       HTML by scripts/minify-html.py at deploy time. -->
+  <script src="../lib/sun.js"></script>
+
+  
+  <script src="app.js"></script>
+</body>
+</html>

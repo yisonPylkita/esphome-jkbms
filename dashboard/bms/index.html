@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="BMS" />
+  <meta name="theme-color" content="#000000" />
+  <title>BMS</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <link rel="apple-touch-icon" href="../favicon.svg" />
+
+  <!-- DSEG7 Modern Bold — 7-segment LCD font, self-hosted. OFL 1.1.
+       Source: https://github.com/keshikan/DSEG (see fonts/DSEG-LICENSE.txt). -->
+  
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="stale" id="stale"><span class="dot"></span><span data-i18n="bms.stale">BMS — BRAK POŁĄCZENIA</span></div>
+
+  <main class="bms-screen" id="screen">
+    <!-- row 1: TopBar -->
+    <div class="topbar">
+      <div class="top-cell">
+        <svg class="icon" viewBox="0 0 16 16" id="bolt-icon"><path d="M9 1L3 9h4l-1 6 6-8H8l1-6z" fill="var(--bms-cyan)" style="filter: drop-shadow(0 0 6px var(--bms-cyan-glow))"/></svg>
+        <span class="seg top-num" id="volt-num">--.-</span>
+        <span class="top-unit" id="volt-unit">V</span>
+      </div>
+      <div class="top-cell">
+        <span class="seg top-num" id="temp-num">--.-</span>
+        <span class="top-unit" id="temp-unit">°C</span>
+        <svg class="icon" viewBox="0 0 16 16" id="thermo-icon" style="filter: drop-shadow(0 0 6px var(--bms-cyan-glow))">
+          <path d="M8 2.5a1.5 1.5 0 0 0-1.5 1.5v6.05a3 3 0 1 0 3 0V4A1.5 1.5 0 0 0 8 2.5zm0 1a.5.5 0 0 1 .5.5v6.5a.6.6 0 0 0 .27.5 2 2 0 1 1-1.54 0 .6.6 0 0 0 .27-.5V4a.5.5 0 0 1 .5-.5z" fill="var(--bms-cyan)"/>
+          <circle cx="8" cy="12" r="1.5" fill="var(--bms-cyan)"/>
+          <path d="M11 4h2M11 6h1.5M11 8h2" stroke="var(--bms-cyan)" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Gauge — 'Refined' variant. SOC digits are inside the SVG so they
+         scale exactly with the half-circle. -->
+    <div class="gauge-slot">
+      <svg class="gauge-svg" id="gauge-svg" viewBox="0 8 100 49" preserveAspectRatio="xMidYMid meet">
+        <!-- faint inner ring -->
+        <path id="gauge-inner" stroke="rgba(56,200,255,0.18)" stroke-width="0.4" fill="none" />
+        <!-- ticks (built by JS) -->
+        <g id="gauge-ticks"></g>
+        <!-- SOC ghost (faint "888") — baseline at y=55 == gauge diameter line,
+             so digits sit on the half-circle's "floor" like a speedometer. -->
+        <text id="soc-ghost" class="soc-svg-text soc-ghost"
+              x="50" y="55" text-anchor="middle" font-size="24" dominant-baseline="alphabetic">88</text>
+        <!-- SOC digits -->
+        <text id="soc-digits" class="soc-svg-text soc-amber"
+              x="50" y="55" text-anchor="middle" font-size="24" dominant-baseline="alphabetic">--</text>
+      </svg>
+    </div>
+
+    <!-- Battery bar (12 cells) -->
+    <div class="battery-bar">
+      <div class="battery-frame" id="battery-frame"></div>
+      <div class="battery-nub" id="battery-nub"></div>
+    </div>
+
+    <!-- Twin readouts — power left, runtime prediction right.
+         Symmetric structure so the eye reads them as a matched pair. -->
+    <div class="bottom-row">
+      <div class="bottom-cell power discharging" id="power-row-inner">
+        <div class="bottom-label" data-i18n="bms.power">moc</div>
+        <div class="bottom-value">
+          <svg class="icon flow-icon" viewBox="0 0 16 16" id="flow-icon" style="filter: drop-shadow(0 0 6px currentColor);">
+            <path id="flow-path" d="M3 5l5 5 5-5M3 9l5 5 5-5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="seg power-num" id="power-num">---</span>
+          <span class="bottom-unit">W</span>
+        </div>
+      </div>
+      <div class="bottom-cell prediction" id="prediction-cell">
+        <div class="bottom-label" id="pred-label">—</div>
+        <div class="bottom-value">
+          <span class="seg" id="pred-time">--:--</span>
+          <span class="bottom-unit" id="pred-day">—</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <a class="toggle-alarm" href="../alarm.html"
+     data-i18n="bms.alarmLink" data-i18n-title="bms.alarmTitle" data-i18n-aria="bms.alarmAria"
+     title="Alarm akumulatorów" aria-label="Otwórz panel alarmu">alarm ›</a>
+  <a class="toggle-adv" href="../bms-dashboard.html"
+     data-i18n="bms.advLink" data-i18n-title="bms.advTitle" data-i18n-aria="bms.advAria"
+     title="Diagnostyka (po angielsku)" aria-label="Otwórz diagnostykę">diagnostyka ›</a>
+
+  <!-- Pure functions extracted for testability — inlined into the deployed
+       HTML by scripts/minify-html.py at deploy time. -->
+  <script src="../lib/zones.js"></script>
+  <script src="../lib/predict.js"></script>
+  <script src="../lib/i18n.js"></script>
+  
+
+  
+  <script src="app.js"></script>
+</body>
+</html>

@@ -51,6 +51,19 @@ def minify_js(js: str) -> str:
 _STYLE_RE = re.compile(r"(<style[^>]*>)(.*?)(</style>)", re.DOTALL)
 _SCRIPT_INLINE_RE = re.compile(r"(<script(?![^>]*\bsrc=)[^>]*>)(.*?)(</script>)", re.DOTALL)
 _SCRIPT_SRC_RE = re.compile(r"<script[^>]*\bsrc=\"([^\"]+)\"[^>]*>\s*</script>")
+# Stylesheet `<link>` tag matched as a whole element so we can replace the
+# entire tag (link is void — has no closing tag, just the leading `<link ... />`).
+_LINK_CSS_RE = re.compile(
+    r"<link\b[^>]*\brel=\"stylesheet\"[^>]*\bhref=\"([^\"]+)\"[^>]*/?>",
+    re.IGNORECASE,
+)
+# Icon-style links — favicon, apple-touch-icon — keep their tag but the href
+# may need flattening (source paths like `../favicon.svg` must become a
+# sibling-relative `favicon.svg` once the build flattens into /config/www/).
+_LINK_ICON_RE = re.compile(
+    r"(<link\b[^>]*\brel=\"(?:icon|apple-touch-icon|shortcut icon)\"[^>]*\bhref=\")([^\"]+)(\"[^>]*/?>)",
+    re.IGNORECASE,
+)
 
 
 def inline_external_scripts(html: str, source_dir: str) -> str:
@@ -71,10 +84,47 @@ def inline_external_scripts(html: str, source_dir: str) -> str:
     return _SCRIPT_SRC_RE.sub(replace, html)
 
 
+def inline_external_stylesheets(html: str, source_dir: str) -> str:
+    """Replace `<link rel="stylesheet" href="X">` with `<style>...minified contents...</style>`.
+
+    Same rationale as inline_external_scripts — source-side files are
+    composable, deployed HTML is single-file.
+    """
+    def replace(match):
+        rel = match.group(1)
+        path = os.path.normpath(os.path.join(source_dir, rel))
+        if not os.path.isfile(path):
+            sys.stderr.write(f"[minify] WARN: <link href=\"{rel}\"> -> {path} not found, leaving as-is\n")
+            return match.group(0)
+        with open(path, "r", encoding="utf-8") as fh:
+            body = fh.read()
+        return f"<style>{minify_css(body)}</style>"
+    return _LINK_CSS_RE.sub(replace, html)
+
+
+def flatten_icon_paths(html: str) -> str:
+    """Strip leading `../` from <link rel="icon">-style hrefs.
+
+    Source layout nests each dashboard one level deep
+    (`dashboard/bms/index.html` → `../favicon.svg`), but the deploy step
+    flattens everything into `/config/www/`, so the icon should sit
+    next to the deployed HTML and be referenced as a bare filename.
+    """
+    def replace(m):
+        head, href, tail = m.group(1), m.group(2), m.group(3)
+        # only flatten relative paths that climb one folder up
+        if href.startswith("../"):
+            href = href[3:]
+        return f"{head}{href}{tail}"
+    return _LINK_ICON_RE.sub(replace, html)
+
+
 def minify_html(html: str, source_dir: str = ".") -> str:
     # Inline external scripts BEFORE we minify any inline scripts — the
     # inlined body itself will be minified by the substitution.
     html = inline_external_scripts(html, source_dir)
+    html = inline_external_stylesheets(html, source_dir)
+    html = flatten_icon_paths(html)
     html = _STYLE_RE.sub(
         lambda m: m.group(1) + minify_css(m.group(2)) + m.group(3), html
     )

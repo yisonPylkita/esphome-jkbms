@@ -98,26 +98,33 @@ fi
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%MZ)"
 
 declare -a BUILT_PAIRS=()
-for src in "$DASHBOARD_DIR/bms-integrated.html" "$DASHBOARD_DIR/dashboard.html" "$DASHBOARD_DIR/alarm.html"; do
-  name="$(basename "$src")"
+# Source layout (component-style folders under dashboard/):
+#   dashboard/bms/index.html       → /config/www/bms-integrated.html
+#   dashboard/alarm/index.html     → /config/www/alarm.html
+#   dashboard/advanced/index.html  → /config/www/bms-dashboard.html
+# Each folder owns its own style.css and app.js; the minifier inlines them
+# (along with lib/*.js shared helpers) into the single deployed HTML.
+for entry in "bms:bms-integrated.html" "advanced:bms-dashboard.html" "alarm:alarm.html"; do
+  folder="${entry%%:*}"
+  outname="${entry##*:}"
+  src="$DASHBOARD_DIR/$folder/index.html"
+  if [ ! -f "$src" ]; then
+    echo "ERROR: missing source $src" >&2; exit 1
+  fi
   before=$(/usr/bin/wc -c < "$src")
   src_hash="$(sha256 "$src" | cut -c1-8)"
   STAMP="${GIT_BRANCH} · ${GIT_COMMIT}${GIT_DIRTY} · src ${src_hash} · ${BUILD_TIME}"
-  /usr/bin/sed -e "s|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|$HA_TOKEN|" \
-               -e "s|__BUILD_STAMP__|${STAMP}|" "$src" \
-    | /usr/bin/python3 "$MINIFY" --source-dir "$DASHBOARD_DIR" > "$WORK/$name"
-  after=$(/usr/bin/wc -c < "$WORK/$name")
-  printf '   built %-26s %d -> %d bytes (%d%%)  stamp=%s\n' \
-    "$name" "$before" "$after" $((after * 100 / before)) "$src_hash"
-  # Map source name -> deployed remote filename. We rename `dashboard.html`
-  # to `bms-dashboard.html` on the box; `alarm.html` and `bms-integrated.html`
-  # keep their names.
-  case "$name" in
-    bms-integrated.html) remote="/config/www/bms-integrated.html" ;;
-    dashboard.html)      remote="/config/www/bms-dashboard.html"  ;;
-    alarm.html)          remote="/config/www/alarm.html"          ;;
-  esac
-  BUILT_PAIRS+=("$WORK/$name=$remote")
+  # Run the minifier first (inlines style.css + app.js + lib/*.js), THEN
+  # substitute the token + build-stamp placeholders. The token placeholder
+  # lives in app.js (not index.html) since the split, so substitution must
+  # happen against the inlined output, not the bare source HTML.
+  /usr/bin/python3 "$MINIFY" --source-dir "$DASHBOARD_DIR/$folder" < "$src" \
+    | /usr/bin/sed -e "s|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|$HA_TOKEN|" \
+                   -e "s|__BUILD_STAMP__|${STAMP}|" > "$WORK/$outname"
+  after=$(/usr/bin/wc -c < "$WORK/$outname")
+  printf '   built %-30s %d -> %d bytes (%d%%)  stamp=%s\n' \
+    "$folder/index.html → $outname" "$before" "$after" $((after * 100 / before)) "$src_hash"
+  BUILT_PAIRS+=("$WORK/$outname=/config/www/$outname")
 done
 
 # ---- 2. Dry-run: hash everything, fetch remote hashes, print diff. ----

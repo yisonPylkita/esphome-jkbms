@@ -46,7 +46,8 @@ fi
 
 # 5. HTML basic-parse — quick smoke test that nothing in the source is
 #    grossly malformed (unbalanced tags, busted entities, etc.).
-for f in dashboard/*.html; do
+HTML_FILES="$(find dashboard -maxdepth 2 -mindepth 2 -name 'index.html' -type f)"
+for f in $HTML_FILES; do
   /usr/bin/python3 - "$f" <<'PY' || fail "html parse: $1"
 import html.parser, sys
 class P(html.parser.HTMLParser):
@@ -54,12 +55,13 @@ class P(html.parser.HTMLParser):
 P().feed(open(sys.argv[1], encoding="utf-8").read())
 PY
 done
-ok "html.parser on $(/bin/ls -1 dashboard/*.html | /usr/bin/wc -l | /usr/bin/tr -d ' ') dashboard(s)"
+ok "html.parser on $(printf '%s\n' "$HTML_FILES" | /usr/bin/wc -l | /usr/bin/tr -d ' ') dashboard(s)"
 
-# 6. Font-link integrity — every /local/fonts/X referenced in HTML must
-#    actually exist in dashboard/fonts/, otherwise the deploy will 404.
+# 6. Font-link integrity — every /local/fonts/X referenced anywhere in the
+#    dashboard sources must actually exist in dashboard/fonts/, otherwise
+#    the deploy will 404.
 MISSING=""
-for ref in $(/usr/bin/grep -hoE '/local/fonts/[A-Za-z0-9._-]+' dashboard/*.html | /usr/bin/sort -u); do
+for ref in $(/usr/bin/grep -rhoE '/local/fonts/[A-Za-z0-9._-]+' dashboard/{bms,alarm,advanced} 2>/dev/null | /usr/bin/sort -u); do
   base="${ref##/local/fonts/}"
   if [ ! -f "dashboard/fonts/$base" ]; then
     MISSING="$MISSING $base"
@@ -68,25 +70,29 @@ done
 [ -z "$MISSING" ] || fail "fonts referenced but not in dashboard/fonts/:$MISSING"
 ok "font references resolve under dashboard/fonts/"
 
-# 7. lib/*.js references resolve — same check for `<script src="lib/...">`.
+# 7. lib/*.js references resolve — references in each dashboard's
+#    index.html now climb one level (`../lib/X.js`) since each lives in
+#    its own folder. Validate every match.
 MISSING_LIB=""
-for ref in $(/usr/bin/grep -hoE 'src="lib/[A-Za-z0-9._/-]+\.js"' dashboard/*.html | /usr/bin/sed -E 's/^src="lib\///; s/"$//' | /usr/bin/sort -u); do
+for ref in $(/usr/bin/grep -rhoE 'src="\.\./lib/[A-Za-z0-9._/-]+\.js"' dashboard/{bms,alarm,advanced} 2>/dev/null | /usr/bin/sed -E 's|^src="\.\./lib/||; s/"$//' | /usr/bin/sort -u); do
   if [ ! -f "dashboard/lib/$ref" ]; then
     MISSING_LIB="$MISSING_LIB $ref"
   fi
 done
 [ -z "$MISSING_LIB" ] || fail "lib scripts referenced but not in dashboard/lib/:$MISSING_LIB"
-ok "<script src=\"lib/...\"> references resolve"
+ok "<script src=\"../lib/...\"> references resolve"
 
-# 8. Minifier round-trip — substitute a fake token, minify both HTMLs,
-#    confirm output still parses as HTML AND contains no unresolved
-#    `<script src="lib/...">` tags (i.e. inlining worked).
+# 8. Minifier round-trip — substitute a fake token, run the minifier on
+#    each component-folder index.html, confirm the output still parses
+#    as HTML AND contains no unresolved `<script src=` or `<link rel=
+#    "stylesheet">` tags (i.e. inlining worked end-to-end).
 TMP="$(/usr/bin/mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-for src in dashboard/bms-integrated.html dashboard/dashboard.html; do
-  out="$TMP/$(basename "$src")"
+for folder in bms alarm advanced; do
+  src="dashboard/$folder/index.html"
+  out="$TMP/$folder.html"
   /usr/bin/sed 's|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|test-token|' "$src" \
-    | /usr/bin/python3 scripts/minify-html.py --source-dir dashboard > "$out" \
+    | /usr/bin/python3 scripts/minify-html.py --source-dir "dashboard/$folder" > "$out" \
     || fail "minify: $src"
   /usr/bin/python3 - "$out" <<'PY' || fail "minified html parse: $1"
 import html.parser, sys
@@ -94,11 +100,14 @@ class P(html.parser.HTMLParser):
     def error(self, m): raise RuntimeError(m)
 P().feed(open(sys.argv[1], encoding="utf-8").read())
 PY
-  if /usr/bin/grep -qE 'src="lib/' "$out"; then
-    fail "minify did not inline lib/ scripts in $(/usr/bin/basename "$src")"
+  if /usr/bin/grep -qE '<script[^>]*\bsrc=' "$out"; then
+    fail "minify left an external <script src=> in $folder/index.html"
+  fi
+  if /usr/bin/grep -qE '<link[^>]*\brel="stylesheet"' "$out"; then
+    fail "minify left an external <link rel=stylesheet> in $folder/index.html"
   fi
 done
-ok "minifier round-trip on both dashboards"
+ok "minifier round-trip on all dashboards"
 
 # 9. Alarm FSM sync — the Node-RED flow embeds a copy of stepAlarm() so
 #    we can run it inside the function node. Enforce that the two stay
