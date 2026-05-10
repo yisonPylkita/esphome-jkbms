@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Vertical-battery favicon shaped after the 12-cell battery bar on the
+  main BMS dashboard. Five colour bands top-to-bottom (green, green,
+  cyan, amber, red) match the SoC palette in dashboard/lib/zones.js.
+  Pure SVG so it scales for any PWA icon size; no rasterisation needed.
+
+  Colour tokens are hard-coded (the favicon doesn't know the page's CSS
+  vars) but match the bms-green / bms-cyan / bms-amber / bms-red CSS
+  custom properties on the dashboards.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="BMS">
+  <rect width="64" height="64" rx="10" fill="#000000"/>
+
+  <!-- battery nub -->
+  <rect x="26" y="6" width="12" height="5" rx="1.5" fill="#1bff7c"/>
+
+  <!-- battery frame -->
+  <rect x="14" y="11" width="36" height="48" rx="5" ry="5"
+        fill="none" stroke="#1bff7c" stroke-width="2.5"/>
+
+  <!-- inner gap so cells sit cleanly inside the frame -->
+  <g>
+    <!-- cells, top → bottom: green, green, cyan, amber, red.
+         8.4-tall each with a 0.6 gap. -->
+    <rect x="18" y="15" width="28" height="8.4" rx="1.4" fill="#1bff7c"/>
+    <rect x="18" y="24" width="28" height="8.4" rx="1.4" fill="#1bff7c"/>
+    <rect x="18" y="33" width="28" height="8.4" rx="1.4" fill="#38c8ff"/>
+    <rect x="18" y="42" width="28" height="8.4" rx="1.4" fill="#ffb200"/>
+    <rect x="18" y="51" width="28" height="8.4" rx="1.4" fill="#ff2e3d"/>
+  </g>
+
+  <!-- soft inner highlight on the leftmost column for a hint of depth -->
+  <rect x="18" y="15" width="3" height="44.4" rx="1" fill="#ffffff" opacity="0.12"/>
+</svg>

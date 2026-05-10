@@ -167,6 +167,12 @@ for pair in "${BUILT_PAIRS[@]}"; do
   $SCP "$local_path" "$HA_USER@$HA_HOST:$remote_path"
 done
 
+# ---- 3b. Favicon (vertical-battery SVG used by all three dashboards). ----
+if [ -f "$HERE/dashboard/favicon.svg" ]; then
+  echo "→ Pushing favicon.svg to /config/www/..."
+  $SCP "$HERE/dashboard/favicon.svg" "$HA_USER@$HA_HOST:/config/www/favicon.svg"
+fi
+
 # ---- 4. Fonts (mirror — remove anything on the box that isn't local) ----
 echo "→ Pushing fonts to /config/www/fonts/..."
 $SSH "mkdir -p /config/www/fonts"
