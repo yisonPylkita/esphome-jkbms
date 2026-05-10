@@ -229,5 +229,5 @@ echo "    http://$HA_HOST:8123/local/bms-integrated.html"
 echo "    http://$HA_HOST:8123/local/bms-dashboard.html"
 echo "    http://$HA_HOST:8123/local/alarm.html"
 echo
-echo "Reminder: import node-red/battery-room-alarm.flow.json into Node-RED"
-echo "if this is a fresh HA install."
+echo "Reminder: on a fresh HA install run \`just restore\` first — it"
+echo "imports homeassistant/node-red/flows.json among other things."

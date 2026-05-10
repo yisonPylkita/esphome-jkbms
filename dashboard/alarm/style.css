@@ -46,9 +46,13 @@ main {
   margin-bottom: 18px;
 }
 .state-name {
-  font-size: clamp(40px, 9dvh, 80px);
+  /* Polish state words run long ("ROZBROJONY", 10 chars). vw-based
+     sizing keeps the longest word inside the viewport on narrow
+     phones; the lower bound stays readable, the upper bound caps
+     growth on wide tablets. */
+  font-size: clamp(28px, 9vw, 72px);
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   line-height: 1;
 }

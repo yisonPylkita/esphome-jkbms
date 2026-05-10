@@ -177,10 +177,12 @@ body {
 .top-cell {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 .top-num {
-  font-size: clamp(28px, 7.5dvh, 8.4vw);
+  /* vw-driven so narrow phones (≤ 360 px) keep the full
+     "53.9 V  16.4 °C" pair on-screen without clipping. */
+  font-size: clamp(26px, 7vw, 60px);
   line-height: 1;
   color: var(--bms-cyan);
   text-shadow: 0 0 10px var(--bms-cyan-glow);
@@ -477,9 +479,11 @@ body {
   height: clamp(20px, 3.2dvh, 28px);
 }
 
-/* Bottom-right toggles. `advanced ›` opens the diagnostic view;
-       `alarm` opens the battery-room alarm dashboard. Same dim
-       uppercase-monospace as the POWER / UNTIL EMPTY captions. */
+/* Bottom corner toggles. Polish "diagnostyka" is a long word, so on
+   narrow portrait viewports stacking both links on the right made them
+   overlap. Split them: `alarm` anchors bottom-LEFT, `diagnostyka`
+   stays bottom-RIGHT — symmetric and readable at any width. Same dim
+   uppercase-monospace as the POWER / UNTIL EMPTY captions. */
 .toggle-adv,
 .toggle-alarm {
   position: fixed;
@@ -493,11 +497,15 @@ body {
   padding: 4px 6px;
   z-index: 9;
 }
-.toggle-adv {
-  right: max(14px, env(safe-area-inset-right));
-}
+/* Anchored to viewport corners. Use plain px + safe-area-inset added on
+   top — the previous max(14px, env(...)) pattern silently produced very
+   large `right` values in some renders (headless Chrome was pushing
+   toggle-adv off-screen until JS tried to compute a layout). */
 .toggle-alarm {
-  right: calc(max(14px, env(safe-area-inset-right)) + 110px);
+  left: calc(14px + env(safe-area-inset-left, 0px));
+}
+.toggle-adv {
+  right: calc(14px + env(safe-area-inset-right, 0px));
 }
 .toggle-adv:hover,
 .toggle-adv:focus-visible,
