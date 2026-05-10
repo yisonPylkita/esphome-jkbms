@@ -6,73 +6,171 @@
   <meta name="theme-color" content="#0a0a0a" />
   <title>BMS · diagnostic</title>
   <style>
+    /* Design tokens — mirror the main dashboard so both views share a
+       palette and accent colours. */
+    :root {
+      --bg:        #000000;
+      --fg:        #e7e7e7;
+      --fg-dim:    rgba(255, 255, 255, 0.55);
+      --fg-muted:  rgba(255, 255, 255, 0.35);
+      --fg-faint:  rgba(255, 255, 255, 0.12);
+      --rule:      rgba(255, 255, 255, 0.07);
+      --bms-cyan:  #38c8ff;
+      --bms-red:   #ff2e3d;
+      --bms-green: #1bff7c;
+      --bms-amber: #ffb200;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html, body {
-      height: 100%;
-      background: #0a0a0a;
-      color: #f5f5f5;
-      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      overflow: hidden;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    body { overflow: auto; user-select: text; -webkit-user-select: text; }
-    /* ---------- Advanced view ---------- */
-    .adv {
-      max-width: 760px;
-      margin: 0 auto;
-      padding: max(16px, env(safe-area-inset-top)) 16px max(80px, env(safe-area-inset-bottom));
-      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
       font-size: 13px;
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---------- Sticky header strip ----------
+       Always-visible summary row at the top, mirroring the readouts you'd
+       glance at on the main dashboard. Updates every poll. */
+    .strip {
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--rule);
+      padding: 10px max(16px, env(safe-area-inset-left)) 10px max(16px, env(safe-area-inset-right));
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px 28px;
+      align-items: baseline;
+      z-index: 10;
+    }
+    .strip .cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .strip .cell .lbl {
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+    }
+    .strip .cell .val {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--fg);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .strip .val.pos    { color: var(--bms-green); }
+    .strip .val.neg    { color: var(--bms-red); }
+    .strip .val.warn   { color: var(--bms-amber); }
+    .strip .val.alert  { color: var(--bms-red); }
+
+    /* ---------- Page body ---------- */
+    .adv {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 16px max(16px, env(safe-area-inset-left)) max(72px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
     }
     .adv h2 {
-      font-size: 12px;
-      letter-spacing: 1.5px;
+      font-size: 10px;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
-      color: #888;
-      margin: 18px 0 6px;
-      font-weight: 600;
-      border-bottom: 1px solid #2a2a2a;
-      padding-bottom: 4px;
+      color: var(--fg-muted);
+      margin: 28px 0 8px;
+      font-weight: 500;
     }
+    .adv h2:first-child { margin-top: 8px; }
+
     .adv .row {
       display: grid;
       grid-template-columns: minmax(180px, 1fr) auto auto;
       gap: 10px;
-      padding: 3px 0;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--rule);
       align-items: baseline;
     }
-    .adv .k { color: #aaa; }
+    .adv .row:last-child { border-bottom: none; }
+    .adv .k { color: var(--fg-dim); }
     .adv .v {
-      color: #f5f5f5;
+      color: var(--fg);
       font-variant-numeric: tabular-nums;
       text-align: right;
       white-space: nowrap;
     }
     .adv .age {
-      color: #555;
+      color: var(--fg-muted);
       font-size: 11px;
       text-align: right;
       white-space: nowrap;
       min-width: 60px;
     }
-    .adv .age.fresh { color: #4ade80; }
-    .adv .age.stale { color: #f87171; }
-    .adv .pos { color: #4ade80; }
-    .adv .neg { color: #fbbf24; }
-    .adv .err { color: #f87171; }
-    .adv .ok  { color: #4ade80; }
-    .feed {
-      background: #111;
-      border-radius: 8px;
-      padding: 8px 12px;
-      max-height: 280px;
-      overflow-y: auto;
-      font-size: 12px;
+    .adv .age.fresh { color: var(--bms-green); }
+    .adv .age.stale { color: var(--bms-red); }
+    .adv .pos { color: var(--bms-green); }
+    .adv .neg { color: var(--bms-amber); }
+    .adv .err { color: var(--bms-red); }
+    .adv .ok  { color: var(--bms-green); }
+
+    /* ---------- Cell bar visualisation ---------- */
+    .cells-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2px;
+      padding: 4px 0;
     }
-    .charts { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+    .cell-line {
+      display: grid;
+      grid-template-columns: 38px 56px 1fr 70px;
+      gap: 10px;
+      align-items: center;
+      padding: 3px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .cell-line .idx  { color: var(--fg-muted); font-size: 11px; }
+    .cell-line .v    { color: var(--fg); }
+    .cell-line .r    { color: var(--fg-dim); font-size: 11px; text-align: right; }
+    .cell-line .bar  {
+      position: relative;
+      height: 8px;
+      background: var(--fg-faint);
+    }
+    .cell-line .bar::after {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: var(--fill, 0%);
+      background: var(--bms-cyan);
+    }
+    .cell-line.cell-min .bar::after { background: var(--bms-amber); }
+    .cell-line.cell-max .bar::after { background: var(--bms-green); }
+    .cell-line.cell-out .bar::after { background: var(--bms-red); }
+
+    /* ---------- History ---------- */
+    .chart-controls {
+      display: flex;
+      gap: 18px;
+      padding: 6px 0;
+    }
+    .chart-controls button {
+      background: none;
+      border: none;
+      color: var(--fg-muted);
+      padding: 4px 0;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .chart-controls button.active { color: var(--fg); }
+    .charts { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
     .chart-row {
       display: grid;
       grid-template-columns: 70px 1fr auto;
@@ -80,75 +178,104 @@
       align-items: center;
       padding: 4px 0;
     }
-    .chart-label { color: #aaa; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+    .chart-label {
+      color: var(--fg-muted);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
     canvas.chart {
       width: 100%;
       height: 64px;
-      background: #111;
-      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
       display: block;
     }
     .chart-cur {
       font-size: 11px;
-      color: #888;
+      color: var(--fg-dim);
       font-variant-numeric: tabular-nums;
       text-align: right;
       min-width: 70px;
     }
-    .chart-meta { color: #555; font-size: 11px; padding: 4px 0; }
-    .chart-controls {
-      display: flex;
-      gap: 6px;
-      margin: 6px 0;
-    }
-    .chart-controls button {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      color: #888;
-      padding: 4px 10px;
-      border-radius: 14px;
-      font-size: 11px;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .chart-controls button.active {
-      background: #2a2a2a;
-      color: #f5f5f5;
-      border-color: #3a3a3a;
-    }
-    .feed .line { color: #aaa; padding: 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .feed .line .t { color: #555; margin-right: 8px; }
-    .feed .line .n { color: #888; }
-    details { margin-top: 12px; }
-    details summary {
-      cursor: pointer;
-      color: #888;
+    .chart-meta { color: var(--fg-muted); font-size: 11px; padding: 6px 0; }
+
+    /* ---------- Live change feed ---------- */
+    .feed {
+      max-height: 280px;
+      overflow-y: auto;
       font-size: 12px;
       padding: 4px 0;
     }
+    .feed .line {
+      color: var(--fg-dim);
+      padding: 2px 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border-bottom: 1px solid var(--rule);
+    }
+    .feed .line:last-child { border-bottom: none; }
+    .feed .line .t { color: var(--fg-muted); margin-right: 8px; }
+    .feed .line .n { color: var(--fg-muted); }
+
+    /* ---------- Raw collapsibles ---------- */
+    details { margin-top: 14px; }
+    details summary {
+      cursor: pointer;
+      color: var(--fg-muted);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 4px 0;
+      list-style: none;
+    }
+    details summary::before { content: "› "; }
+    details[open] summary::before { content: "⌄ "; }
     pre.raw {
-      background: #111;
-      border-radius: 8px;
-      padding: 12px;
       font-size: 11px;
       max-height: 400px;
       overflow: auto;
-      color: #aaa;
+      color: var(--fg-dim);
       white-space: pre-wrap;
       word-break: break-all;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+      margin-top: 4px;
     }
 
-    @media (orientation: landscape) and (max-height: 500px) {
-      .app { flex-direction: row; flex-wrap: wrap; }
-      .card { flex: 1 1 45%; }
-      .advice { flex: 1 1 100%; }
+    /* ---------- Toggle back to main view ----------
+       Mirrors the `advanced ›` toggle on the main dashboard. */
+    .toggle-main {
+      position: fixed;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      left:   max(14px, env(safe-area-inset-left));
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.35);
+      text-decoration: none;
+      padding: 4px 6px;
+      z-index: 20;
     }
-
-    .hidden { display: none !important; }
-
+    .toggle-main:hover, .toggle-main:focus-visible {
+      color: rgba(255, 255, 255, 0.75);
+      outline: none;
+    }
   </style>
 </head>
 <body id="body">
+
+  <!-- Sticky summary strip — always-visible glance row at the top.
+       Updates every poll from the same fetch the body sections use. -->
+  <div class="strip" id="strip">
+    <div class="cell"><span class="lbl">soc</span><span class="val" id="s-soc">--</span></div>
+    <div class="cell"><span class="lbl">voltage</span><span class="val" id="s-volt">--</span></div>
+    <div class="cell"><span class="lbl">power</span><span class="val" id="s-power">--</span></div>
+    <div class="cell"><span class="lbl">current</span><span class="val" id="s-cur">--</span></div>
+    <div class="cell"><span class="lbl">temp avg</span><span class="val" id="s-temp">--</span></div>
+    <div class="cell"><span class="lbl">link</span><span class="val" id="s-link">--</span></div>
+    <div class="cell"><span class="lbl">uptime</span><span class="val" id="s-up">--</span></div>
+  </div>
 
   <!-- Advanced / diagnostic view — the only view in this file. Main page
        (the customer-facing UI) lives in bms-integrated.html. -->
@@ -156,8 +283,14 @@
     <h2>Connection</h2>
     <div id="conn"></div>
 
-    <h2>Battery — live</h2>
+    <h2>Battery</h2>
     <div id="live"></div>
+
+    <h2>Cells (16S)</h2>
+    <div class="cells-grid" id="cells"></div>
+
+    <h2>Temperatures</h2>
+    <div id="temps"></div>
 
     <h2>History</h2>
     <div class="chart-controls" id="range-buttons">
@@ -191,16 +324,10 @@
     </div>
     <div class="chart-meta" id="chart-meta">--</div>
 
-    <h2>Cells (16S)</h2>
-    <div id="cells"></div>
-
-    <h2>Temperatures</h2>
-    <div id="temps"></div>
-
     <h2>Change stream</h2>
     <div class="feed" id="feed"></div>
 
-    <h2>Polling diagnostics</h2>
+    <h2>Polling</h2>
     <div id="poll"></div>
 
     <details>
@@ -213,6 +340,8 @@
       <pre class="raw" id="cfg">--</pre>
     </details>
   </div>
+
+  <a class="toggle-main" href="bms-integrated.html" title="Switch to main dashboard" aria-label="Switch to main dashboard">‹ main</a>
 
 
   <script>
@@ -329,20 +458,26 @@
     });
 
     // -------- Advanced view --------
-    const lastSeen = {};       // entity_id -> last state for diff detection
-    const feed = [];           // {ts, entity_id, prev, next}
+    const lastSeen = {};        // entity_id -> last state (for diff detection)
+    const lastFetchedAt = {};   // entity_id -> Date.now() of most recent poll that included it
+    const feed = [];            // {ts, entity_id, prev, next}
     const pollStats = { ok: 0, err: 0, lastLatencyMs: 0, lastFetchAt: null };
 
-    function ageStr(updIso) {
-      if (!updIso) return '?';
-      const ms = Date.now() - new Date(updIso).getTime();
+    // Age column = "time since we last fetched the entity from HA". HA's
+    // own `last_updated` / `last_changed` / `last_reported` are all
+    // deduplicated against the value, so a static reading (SOH=100,
+    // errors=0, balancing=0) shows hours of "age" even though we just
+    // received it on this very poll. We record fetch time client-side
+    // instead, which honestly answers "is this data current?".
+    function ageStrMs(ms) {
+      if (!isFinite(ms)) return '?';
       if (ms < 1000) return ms + 'ms';
       if (ms < 60000) return (ms/1000).toFixed(1) + 's';
       if (ms < 3600000) return Math.round(ms/60000) + 'm';
       return Math.round(ms/3600000) + 'h';
     }
-    function ageClass(updIso) {
-      const ms = Date.now() - new Date(updIso).getTime();
+    function ageClassMs(ms) {
+      if (!isFinite(ms)) return '';
       if (ms < 5000) return 'fresh';
       if (ms < STALE_MS) return '';
       return 'stale';
@@ -350,9 +485,11 @@
 
     function diffAndLog(states) {
       const ts = new Date();
+      const nowMs = Date.now();
       for (const e of states) {
         const id = e.entity_id;
         if (!id.includes('jk_pb_bms')) continue;
+        lastFetchedAt[id] = nowMs;     // every poll that includes the entity counts as "fresh"
         const prev = lastSeen[id];
         const next = e.state;
         if (prev !== undefined && prev !== next) {
@@ -363,8 +500,75 @@
       }
     }
 
-    function row(k, v, age, cls) {
-      return `<div class="row"><div class="k">${k}</div><div class="v ${cls||''}">${v}</div><div class="age ${age?ageClass(age):''}">${age?ageStr(age):''}</div></div>`;
+    // `entity` is the raw HA state object (or null/undefined). Age is read
+    // from our client-side `lastFetchedAt` map, NOT from HA timestamps.
+    function row(k, v, entity, cls) {
+      let ageText = '', ageCls = '';
+      if (entity && entity.entity_id) {
+        const last = lastFetchedAt[entity.entity_id];
+        if (last) {
+          const ms = Date.now() - last;
+          ageText = ageStrMs(ms);
+          ageCls  = ageClassMs(ms);
+        }
+      }
+      return `<div class="row"><div class="k">${k}</div><div class="v ${cls||''}">${v}</div><div class="age ${ageCls}">${ageText}</div></div>`;
+    }
+
+    // ---------- Sticky summary strip ----------
+    function fmtUptime(s) {
+      if (!isFinite(s)) return '?';
+      const d = Math.floor(s/86400);
+      const h = Math.floor((s%86400)/3600);
+      const m = Math.floor((s%3600)/60);
+      if (d) return `${d}d ${h}h`;
+      if (h) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+    function renderStrip(get) {
+      const setVal = (id, txt, cls) => {
+        const el = $(id);
+        el.textContent = txt;
+        el.className = 'val' + (cls ? ' ' + cls : '');
+      };
+      const num = (e, dec=1) => {
+        if (!e) return NaN;
+        const n = parseFloat(e.state);
+        return isNaN(n) ? NaN : n;
+      };
+
+      const soc  = num(get('sensor.jk_pb_bms_state_of_charge'), 0);
+      const volt = num(get('sensor.jk_pb_bms_total_voltage'));
+      const pwr  = num(get('sensor.jk_pb_bms_power'));
+      const cur  = num(get('sensor.jk_pb_bms_current'));
+      const onl  = get('binary_sensor.jk_pb_bms_online_status');
+
+      // average across the BMS NTCs for a single representative number
+      const tVals = [
+        'sensor.jk_pb_bms_temperature_sensor_1',
+        'sensor.jk_pb_bms_temperature_sensor_2',
+        'sensor.jk_pb_bms_temperature_sensor_3',
+        'sensor.jk_pb_bms_temperature_sensor_4',
+        'sensor.jk_pb_bms_temperature_sensor_5',
+      ].map(id => num(get(id))).filter(n => !isNaN(n));
+      const tAvg = tVals.length ? tVals.reduce((a,b)=>a+b,0) / tVals.length : NaN;
+
+      const upt  = num(get('sensor.jk_pb_bms_jk_pb_bms_uptime'));
+
+      // SOC colour: red <30, amber 30-70, green ≥70 — matches main view.
+      const socCls  = isNaN(soc) ? '' : soc < 30 ? 'neg' : soc >= 70 ? 'pos' : 'warn';
+      const voltCls = isNaN(volt) ? '' : (volt < 48 ? 'neg' : volt > 58 ? 'neg' : volt > 56 ? 'warn' : '');
+      const pwrCls  = isNaN(pwr)  ? '' : (pwr >  5 ? 'pos' : pwr < -5 ? 'neg' : '');
+      const tempCls = isNaN(tAvg) ? '' : (tAvg < 5 ? 'neg' : tAvg > 35 ? 'neg' : tAvg > 30 ? 'warn' : '');
+      const linkOk  = onl && onl.state === 'on';
+
+      setVal('s-soc',   isNaN(soc)  ? '--'  : `${soc.toFixed(0)} %`,  socCls);
+      setVal('s-volt',  isNaN(volt) ? '--'  : `${volt.toFixed(1)} V`, voltCls);
+      setVal('s-power', isNaN(pwr)  ? '--'  : `${pwr  >= 0 ? '+' : ''}${pwr.toFixed(0)} W`, pwrCls);
+      setVal('s-cur',   isNaN(cur)  ? '--'  : `${cur  >= 0 ? '+' : ''}${cur.toFixed(2)} A`, pwrCls);
+      setVal('s-temp',  isNaN(tAvg) ? '--'  : `${tAvg.toFixed(1)} °C`, tempCls);
+      setVal('s-link',  linkOk ? 'on' : 'off', linkOk ? 'pos' : 'neg');
+      setVal('s-up',    fmtUptime(upt), '');
     }
 
     function renderAdvanced(states, latencyMs) {
@@ -375,6 +579,10 @@
       const numOr = (e, dec=2) => { if (!e) return '--'; const n = parseFloat(e.state); return isNaN(n) ? e.state : n.toFixed(dec); };
       const unitOf = (e) => e ? (e.attributes||{}).unit_of_measurement || '' : '';
 
+      // Sticky summary strip at the top — same data as the body sections,
+      // pinned for at-a-glance scanning while scrolling diagnostics below.
+      renderStrip(get);
+
       // Connection
       const wifi = get('sensor.jk_pb_bms_jk_pb_bms_wifi_signal');
       const upt  = get('sensor.jk_pb_bms_jk_pb_bms_uptime');
@@ -383,10 +591,10 @@
       const onlState = onl ? (onl.state === 'on' ? '<span class="ok">✓ ON</span>' : '<span class="err">✗ OFF</span>') : '?';
       const uptHuman = upt ? humanDuration(parseFloat(upt.state)) : '?';
       $('conn').innerHTML =
-        row('BMS BLE link',     onlState, onl && onl.last_changed) +
-        row('ESP uptime',       uptHuman, upt && upt.last_updated) +
-        row('WiFi signal',      `${numOr(wifi, 0)} ${unitOf(wifi)}`, wifi && wifi.last_updated) +
-        row('Internal temp',    `${numOr(itmp, 1)} ${unitOf(itmp)}`, itmp && itmp.last_updated);
+        row('BMS BLE link',     onlState,                                        onl) +
+        row('ESP uptime',       uptHuman,                                        upt) +
+        row('WiFi signal',      `${numOr(wifi, 0)} ${unitOf(wifi)}`,             wifi) +
+        row('Internal temp',    `${numOr(itmp, 1)} ${unitOf(itmp)}`,             itmp);
 
       // Live
       const soc  = get(ENTITIES.soc);
@@ -412,29 +620,65 @@
       const errN = errB ? parseFloat(errB.state) : NaN;
       const errCls = errN > 0 ? 'err' : 'ok';
       $('live').innerHTML =
-        row('SOC',                       `${numOr(soc, 0)} ${unitOf(soc)}`,            soc && soc.last_updated) +
-        row('State of health',           `${numOr(soh, 0)} ${unitOf(soh)}`,            soh && soh.last_updated) +
-        row('Total voltage',             `${numOr(tv, 3)} ${unitOf(tv)}`,              tv && tv.last_updated) +
-        row('Current',                   `${numOr(cur, 3)} ${unitOf(cur)}`,            cur && cur.last_updated, curCls) +
-        row('Power',                     `${numOr(pwr, 1)} ${unitOf(pwr)}`,            pwr && pwr.last_updated, curCls) +
-        row('Capacity remaining / total',`${numOr(cap, 1)} / ${numOr(capT, 0)} Ah`,    cap && cap.last_updated) +
-        row('Cycles · lifetime Ah',      `${numOr(cyc, 0)} · ${numOr(cycCap, 0)} Ah`,  cyc && cyc.last_updated) +
-        row('Balancing current',         `${numOr(balC, 3)} ${unitOf(balC)}`,          balC && balC.last_updated) +
-        row('Charge status',             `${csText || '?'} (id ${numOr(csId, 0)})`,    csId && csId.last_updated) +
-        row('Errors',                    `${errText || '(none)'} <span class="${errCls}">[bitmask ${numOr(errB,0)}]</span>`, errB && errB.last_updated, errCls);
+        row('SOC',                       `${numOr(soc, 0)} ${unitOf(soc)}`,            soc) +
+        row('State of health',           `${numOr(soh, 0)} ${unitOf(soh)}`,            soh) +
+        row('Total voltage',             `${numOr(tv, 3)} ${unitOf(tv)}`,              tv) +
+        row('Current',                   `${numOr(cur, 3)} ${unitOf(cur)}`,            cur,  curCls) +
+        row('Power',                     `${numOr(pwr, 1)} ${unitOf(pwr)}`,            pwr,  curCls) +
+        row('Capacity remaining / total',`${numOr(cap, 1)} / ${numOr(capT, 0)} Ah`,    cap) +
+        row('Cycles · lifetime Ah',      `${numOr(cyc, 0)} · ${numOr(cycCap, 0)} Ah`,  cyc) +
+        row('Balancing current',         `${numOr(balC, 3)} ${unitOf(balC)}`,          balC) +
+        row('Charge status',             `${csText || '?'} (id ${numOr(csId, 0)})`,    csId) +
+        row('Errors',                    `${errText || '(none)'} <span class="${errCls}">[bitmask ${numOr(errB,0)}]</span>`, errB, errCls);
 
-      // Cells (voltage + wire resistance)
-      let cellsHtml = '';
+      // Cells (voltage + wire resistance) — rendered as horizontal bars
+      // mapped over the live min/max so imbalance jumps out visually:
+      // bar fill = (v - vMin) / (vMax - vMin) → green at top of pack, amber
+      // at bottom, red flagged separately when delta > 50 mV.
+      const cellSamples = [];
       for (let i = 1; i <= 16; i++) {
         const cv = get(`sensor.jk_pb_bms_cell_voltage_${i}`);
         const cr = get(`sensor.jk_pb_bms_cell_resistance_${i}`);
-        const v  = cv ? numOr(cv, 3) : '--';
-        const r  = cr ? `${(parseFloat(cr.state)*1000).toFixed(1)} mΩ` : '--';
-        cellsHtml += row(
-          `Cell ${String(i).padStart(2,'0')}`,
-          `${v} V · ${r}`,
-          (cv && cv.last_updated) || (cr && cr.last_updated)
-        );
+        const v  = cv ? parseFloat(cv.state) : NaN;
+        const r  = cr ? parseFloat(cr.state) * 1000 : NaN;
+        cellSamples.push({ i, v, r });
+      }
+      const valid = cellSamples.filter(c => Number.isFinite(c.v));
+      const vMin = valid.length ? Math.min(...valid.map(c => c.v)) : 0;
+      const vMax = valid.length ? Math.max(...valid.map(c => c.v)) : 1;
+      const delta = vMax - vMin;
+
+      // The bar's full-scale span is a fixed minimum window so a balanced
+      // pack (≤5 mV total spread) doesn't get visually amplified into
+      // looking imbalanced — all cells will then sit near the middle of
+      // a wider implied scale. Only when imbalance is real (>30 mV) do we
+      // start colour-coding extremes.
+      const SCALE_MV = 0.030;       // visualisation half-window
+      const ALERT_MV = 0.030;       // "moderate" imbalance highlight threshold
+      const OUTLIER_MV = 0.080;     // "bad" imbalance threshold
+      const span = Math.max(delta, SCALE_MV);
+      const mid = (vMax + vMin) / 2;
+      const lo = mid - span / 2;
+      let cellsHtml = '';
+      for (const c of cellSamples) {
+        const pct = Number.isFinite(c.v) ? Math.round(((c.v - lo) / span) * 100) : 0;
+        let cls = '';
+        if (Number.isFinite(c.v) && delta > ALERT_MV) {
+          if (delta > OUTLIER_MV) {
+            if (c.v === vMin || c.v === vMax) cls = 'cell-out';
+          } else {
+            if (c.v === vMin) cls = 'cell-min';
+            else if (c.v === vMax) cls = 'cell-max';
+          }
+        }
+        const v = Number.isFinite(c.v) ? c.v.toFixed(3) : '--';
+        const r = Number.isFinite(c.r) ? `${c.r.toFixed(1)} mΩ` : '--';
+        cellsHtml += `<div class="cell-line ${cls}">`
+                  + `<div class="idx">${String(c.i).padStart(2,'0')}</div>`
+                  + `<div class="v">${v}</div>`
+                  + `<div class="bar" style="--fill: ${Math.max(0, Math.min(100, pct))}%"></div>`
+                  + `<div class="r">${r}</div>`
+                  + `</div>`;
       }
       $('cells').innerHTML = cellsHtml;
 
@@ -448,13 +692,13 @@
       const heat = get('binary_sensor.jk_pb_bms_heating');
       const heatHtml = heat ? (heat.state === 'on' ? '<span class="ok">ON</span>' : 'off') : '?';
       $('temps').innerHTML =
-        row('Sensor 1',     `${numOr(t1, 1)} °C`, t1 && t1.last_updated) +
-        row('Sensor 2',     `${numOr(t2, 1)} °C`, t2 && t2.last_updated) +
-        row('Sensor 3',     `${numOr(t3, 1)} °C`, t3 && t3.last_updated) +
-        row('Sensor 4',     `${numOr(t4, 1)} °C`, t4 && t4.last_updated) +
-        row('Sensor 5',     `${numOr(t5, 1)} °C`, t5 && t5.last_updated) +
-        row('MOSFET',       `${numOr(tp, 1)} °C`, tp && tp.last_updated) +
-        row('Heater active',heatHtml,            heat && heat.last_changed);
+        row('Sensor 1',     `${numOr(t1, 1)} °C`,  t1) +
+        row('Sensor 2',     `${numOr(t2, 1)} °C`,  t2) +
+        row('Sensor 3',     `${numOr(t3, 1)} °C`,  t3) +
+        row('Sensor 4',     `${numOr(t4, 1)} °C`,  t4) +
+        row('Sensor 5',     `${numOr(t5, 1)} °C`,  t5) +
+        row('MOSFET',       `${numOr(tp, 1)} °C`,  tp) +
+        row('Heater active',heatHtml,              heat);
 
       // Feed
       $('feed').innerHTML = feed.length === 0
@@ -503,9 +747,16 @@
       if (isDemo) return demoHistory(hours);
       const end = new Date();
       const start = new Date(end.getTime() - hours * 3600 * 1000);
+      // significant_changes_only & no_attributes shrink the JSON dramatically
+      // (BMS power changes constantly — a 24h window without these flags
+      // returns ~50k samples per entity × 9 entities). With them, a 24h
+      // request finishes in well under a second.
       const url = `${HA_URL}/api/history/period/${start.toISOString()}`
                 + `?filter_entity_id=${HISTORY_ENTITIES.join(',')}`
-                + `&minimal_response&end_time=${end.toISOString()}`;
+                + `&minimal_response`
+                + `&significant_changes_only`
+                + `&no_attributes`
+                + `&end_time=${end.toISOString()}`;
       const r = await fetch(url, {
         headers: { 'Authorization': 'Bearer ' + TOKEN },
         cache: 'no-store',
@@ -547,6 +798,62 @@
           arr.push({ t, v });
         }
         out[eid] = arr;
+      }
+      return out;
+    }
+
+    // ---------- Sunrise / sunset for Warsaw, Poland ----------
+    // Pure client-side astronomical computation — no extra HA round-trip.
+    // Accuracy ±1 minute is plenty for visual day/night shading. NOAA-style
+    // simplified algorithm (https://en.wikipedia.org/wiki/Sunrise_equation).
+    const WARSAW_LAT = 52.2297;
+    const WARSAW_LON = 21.0122;
+
+    // SunCalc-style algorithm (Vladimir Agafonkin's public-domain port of
+    // the NOAA equations). Verified for Warsaw against timeanddate.com:
+    // 2026-05-10 → rise 04:50 local / set 20:16 local (within ~minutes).
+    function sunTimesFor(date, lat, lng) {
+      const J2000 = 2451545.0;
+      const lw = -lng * Math.PI / 180;        // west longitude (radians)
+      const phi = lat * Math.PI / 180;        // latitude (radians)
+      const d = date.getTime() / 86400000 - 0.5 + 2440587.5 - J2000;
+      const n = Math.round(d - 0.0009 - lw / (2 * Math.PI));
+      const ds = 0.0009 + lw / (2 * Math.PI) + n;
+      const M = (357.5291 + 0.98560028 * ds) * Math.PI / 180;
+      const C = (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M)) * Math.PI / 180;
+      const L = M + C + Math.PI + 102.9372 * Math.PI / 180;
+      const Jnoon = J2000 + ds + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
+      const dec = Math.asin(Math.sin(L) * Math.sin(23.4397 * Math.PI / 180));
+      const cosH = (Math.sin(-0.83 * Math.PI / 180) - Math.sin(phi) * Math.sin(dec)) /
+                   (Math.cos(phi) * Math.cos(dec));
+      if (cosH < -1 || cosH > 1) return { sunrise: null, sunset: null };
+      const H = Math.acos(cosH);
+      const dsSet = 0.0009 + (H + lw) / (2 * Math.PI) + n;
+      const Jset  = J2000 + dsSet + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
+      const Jrise = Jnoon - (Jset - Jnoon);
+      return {
+        sunrise: new Date((Jrise - 2440587.5) * 86400000),
+        sunset:  new Date((Jset  - 2440587.5) * 86400000),
+      };
+    }
+
+    // Returns night intervals [{start, end}] in ms covering any night that
+    // touches [startMs, endMs]. Each "night" = sunset[d] → sunrise[d+1].
+    function nightIntervals(startMs, endMs, lat, lon) {
+      const out = [];
+      const dayMs = 86400000;
+      let d = new Date(startMs - dayMs);
+      d.setUTCHours(12, 0, 0, 0);
+      const limit = endMs + dayMs;
+      while (d.getTime() < limit) {
+        const today = sunTimesFor(d, lat, lon);
+        const tomorrow = sunTimesFor(new Date(d.getTime() + dayMs), lat, lon);
+        if (today.sunset && tomorrow.sunrise) {
+          const cs = Math.max(today.sunset.getTime(), startMs);
+          const ce = Math.min(tomorrow.sunrise.getTime(), endMs);
+          if (cs < ce) out.push({ start: cs, end: ce });
+        }
+        d = new Date(d.getTime() + dayMs);
       }
       return out;
     }
@@ -608,6 +915,12 @@
       const dpr = devicePixelRatio || 1;
       const cssW = canvas.clientWidth;
       const cssH = canvas.clientHeight;
+      // Layout can sometimes call us with a not-yet-measured canvas (cssW = 0
+      // on initial paint before flexbox settles). Skipping the draw and
+      // relying on the ResizeObserver below to fire a redraw once the canvas
+      // gets a real width avoids the "blank charts until you click a range
+      // button" symptom.
+      if (cssW === 0 || cssH === 0) return;
       if (canvas.width !== Math.round(cssW * dpr)) {
         canvas.width = Math.round(cssW * dpr);
         canvas.height = Math.round(cssH * dpr);
@@ -624,6 +937,69 @@
       }
       const padX = 4, padY = 6;
       const W = cssW - padX * 2, H = cssH - padY * 2;
+
+      // Day/night shading. The chart background is black, so we paint
+      // *day* with a warm yellow tint (sun overhead) and leave nights as
+      // the default black. Plus thin vertical markers on each transition
+      // so the boundary is unambiguous even at low opacity.
+      if (opts.nights && opts.startMs && opts.endMs && opts.endMs > opts.startMs) {
+        const xFromMs = (ms) => padX + ((ms - opts.startMs) / (opts.endMs - opts.startMs)) * W;
+
+        // Day = the complement of all night intervals within [startMs, endMs].
+        // Build a simple swept list of disjoint day-bands.
+        const sortedNights = opts.nights.slice().sort((a, b) => a.start - b.start);
+        const days = [];
+        let cursor = opts.startMs;
+        for (const n of sortedNights) {
+          if (n.start > cursor) days.push({ start: cursor, end: Math.min(n.start, opts.endMs) });
+          cursor = Math.max(cursor, n.end);
+          if (cursor >= opts.endMs) break;
+        }
+        if (cursor < opts.endMs) days.push({ start: cursor, end: opts.endMs });
+
+        ctx.fillStyle = 'rgba(255, 200, 80, 0.06)';
+        for (const d of days) {
+          const x1 = Math.max(padX, xFromMs(d.start));
+          const x2 = Math.min(padX + W, xFromMs(d.end));
+          if (x2 > x1) ctx.fillRect(x1, padY, x2 - x1, H);
+        }
+
+        // Subtle vertical hairlines on every sunrise/sunset transition that
+        // falls inside the visible window — gives a hard edge that reads
+        // even when the warm fill is faint.
+        ctx.strokeStyle = 'rgba(255, 200, 80, 0.30)';
+        ctx.lineWidth = 1;
+        const transitions = new Set();
+        for (const n of sortedNights) {
+          if (n.start > opts.startMs && n.start < opts.endMs) transitions.add(n.start);
+          if (n.end   > opts.startMs && n.end   < opts.endMs) transitions.add(n.end);
+        }
+        for (const t of transitions) {
+          const x = xFromMs(t);
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, padY);
+          ctx.lineTo(x + 0.5, padY + H);
+          ctx.stroke();
+        }
+
+        // Sun / moon glyph anchored to the right edge of each band wider
+        // than 22 px. Pinned to the top so it never sits on top of the
+        // line data; right-aligned so it labels the *most recent* end of
+        // each phase.
+        ctx.font = '16px ui-monospace, monospace';
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'right';
+        const glyphY = padY + 1;
+        const drawGlyph = (band, glyph, color) => {
+          const x1 = Math.max(padX, xFromMs(band.start));
+          const x2 = Math.min(padX + W, xFromMs(band.end));
+          if (x2 - x1 < 22) return;
+          ctx.fillStyle = color;
+          ctx.fillText(glyph, x2 - 4, glyphY);
+        };
+        for (const d of days)         drawGlyph(d, '☀',  'rgba(255, 200, 80, 0.7)');
+        for (const n of sortedNights) drawGlyph(n, '☾', 'rgba(180, 200, 255, 0.6)');
+      }
 
       let yMin = Infinity, yMax = -Infinity;
       for (const b of buckets) {
@@ -740,10 +1116,14 @@
       const tempArrs = TEMP_HISTORY_ENTITIES.map(eid => buckets(eid));
       const tempB = mergeMaxBuckets(tempArrs);
 
-      drawChart($('chart-soc'),     socB, { lineColor: '#4ade80', fixedMin: 0, fixedMax: 100 });
-      drawChart($('chart-current'), curB, { band: true, bandColor: 'rgba(251, 191, 36, 0.18)', lineColor: '#fbbf24', zeroLine: true });
-      drawChart($('chart-power'),   pwrB, { band: true, bandColor: 'rgba(251, 191, 36, 0.18)', lineColor: '#fbbf24', zeroLine: true });
-      drawChart($('chart-temp'),    tempB, { band: true, bandColor: 'rgba(96, 165, 250, 0.18)', lineColor: '#60a5fa' });
+      // Day/night band passed to every chart so the time axis is legible
+      // (e.g. you can immediately see overnight discharge vs daytime PV).
+      const nights = nightIntervals(start, end, WARSAW_LAT, WARSAW_LON);
+      const baseOpts = { startMs: start, endMs: end, nights };
+      drawChart($('chart-soc'),     socB,  { ...baseOpts, lineColor: '#4ade80', fixedMin: 0, fixedMax: 100 });
+      drawChart($('chart-current'), curB,  { ...baseOpts, band: true, bandColor: 'rgba(251, 191, 36, 0.18)', lineColor: '#fbbf24', zeroLine: true });
+      drawChart($('chart-power'),   pwrB,  { ...baseOpts, band: true, bandColor: 'rgba(251, 191, 36, 0.18)', lineColor: '#fbbf24', zeroLine: true });
+      drawChart($('chart-temp'),    tempB, { ...baseOpts, band: true, bandColor: 'rgba(96, 165, 250, 0.18)', lineColor: '#60a5fa' });
 
       const last = (arr) => arr.length ? arr[arr.length - 1] : null;
       const fmt = (n, dec=1) => isFinite(n) ? n.toFixed(dec) : '--';
@@ -783,9 +1163,18 @@
     document.querySelectorAll('#range-buttons button').forEach(b =>
       b.classList.toggle('active', parseInt(b.dataset.h, 10) === historyHours));
 
-    // Redraw charts on resize / view switch
-    new ResizeObserver(() => { if (historyCache) renderHistory(); })
-      .observe($('view-advanced'));
+    // Redraw charts when each canvas is actually measured. Observing the
+    // canvases individually (rather than the parent view) means we get a
+    // real "first measurement" callback even on the initial load, which
+    // previously caused charts to render blank until the user clicked a
+    // range button to force a manual redraw.
+    const chartObserver = new ResizeObserver(() => { if (historyCache) renderHistory(); });
+    ['#chart-soc', '#chart-current', '#chart-power', '#chart-temp']
+      .forEach(sel => { const el = document.querySelector(sel); if (el) chartObserver.observe(el); });
+
+    // Kick off the first history fetch immediately rather than waiting for
+    // the first 1 Hz state poll — saves up to a second of perceived latency.
+    refreshHistoryIfStale().then(renderHistory).catch(() => renderHistory());
 
     // -------- Tick --------
     let timer = null;

@@ -221,9 +221,11 @@
     }
     .soc-amber  { fill: var(--bms-amber); filter: drop-shadow(0 0 4px var(--bms-amber-glow)); }
     .soc-red    { fill: var(--bms-red);   filter: drop-shadow(0 0 4px var(--bms-red-glow)); }
+    .soc-cyan   { fill: var(--bms-cyan);  filter: drop-shadow(0 0 4px var(--bms-cyan-glow)); }
     .soc-green  { fill: var(--bms-green); filter: drop-shadow(0 0 4px var(--bms-green-glow)); }
-    .soc-ghost  { fill: var(--bms-amber); opacity: 0.07; filter: none; }
+    .soc-ghost  { fill: var(--bms-cyan); opacity: 0.07; filter: none; }
     .soc-ghost.low  { fill: var(--bms-red); }
+    .soc-ghost.warn { fill: var(--bms-amber); }
     .soc-ghost.high { fill: var(--bms-green); }
 
     /* Battery bar — 12 cells, zone-tinted, with frame glow. */
@@ -239,6 +241,7 @@
       box-shadow: 0 0 18px var(--bms-cyan-glow), inset 0 0 12px rgba(0,0,0,0.6);
     }
     .battery-frame.low  { border-color: var(--bms-red);   box-shadow: 0 0 18px var(--bms-red-glow),   inset 0 0 12px rgba(0,0,0,0.6); }
+    .battery-frame.warn { border-color: var(--bms-amber); box-shadow: 0 0 18px var(--bms-amber-glow), inset 0 0 12px rgba(0,0,0,0.6); }
     .battery-frame.high { border-color: var(--bms-green); box-shadow: 0 0 18px var(--bms-green-glow), inset 0 0 12px rgba(0,0,0,0.6); }
     .battery-cell {
       flex: 1; height: clamp(20px, 6dvh, 6vw); border-radius: 3px;
@@ -246,6 +249,7 @@
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
     }
     .battery-cell.on-low  { background: var(--bms-red);   box-shadow: 0 0 8px var(--bms-red-glow),   inset 0 -2px 0 rgba(0,0,0,0.2); }
+    .battery-cell.on-warn { background: var(--bms-amber); box-shadow: 0 0 8px var(--bms-amber-glow), inset 0 -2px 0 rgba(0,0,0,0.2); }
     .battery-cell.on-mid  { background: var(--bms-cyan);  box-shadow: 0 0 8px var(--bms-cyan-glow),  inset 0 -2px 0 rgba(0,0,0,0.2); }
     .battery-cell.on-high { background: var(--bms-green); box-shadow: 0 0 8px var(--bms-green-glow), inset 0 -2px 0 rgba(0,0,0,0.2); }
     .battery-nub {
@@ -253,6 +257,7 @@
       background: var(--bms-cyan); box-shadow: 0 0 10px var(--bms-cyan-glow);
     }
     .battery-nub.low  { background: var(--bms-red);   box-shadow: 0 0 10px var(--bms-red-glow); }
+    .battery-nub.warn { background: var(--bms-amber); box-shadow: 0 0 10px var(--bms-amber-glow); }
     .battery-nub.high { background: var(--bms-green); box-shadow: 0 0 10px var(--bms-green-glow); }
 
     /* PowerReadout — centered single optical line. Signed digits + W. */
@@ -450,13 +455,20 @@
       const a = deg * Math.PI / 180;
       return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
     }
+    // Four-tier SOC banding:
+    //   low  < 20%   red    — critical, stop using
+    //   warn < 40%   amber  — approaching low, plan to recharge
+    //   mid  < 70%   cyan   — normal operating range
+    //   high ≥ 70%   green  — well charged
     function tickFillColor(t) {
-      if (t < 0.30) return 'var(--bms-red)';
+      if (t < 0.20) return 'var(--bms-red)';
+      if (t < 0.40) return 'var(--bms-amber)';
       if (t < 0.70) return 'var(--bms-cyan)';
       return 'var(--bms-green)';
     }
     function socZone(soc) {
-      if (soc < 30) return 'low';
+      if (soc < 20) return 'low';
+      if (soc < 40) return 'warn';
       if (soc < 70) return 'mid';
       return 'high';
     }
@@ -509,9 +521,12 @@
         const c = document.createElement('div');
         c.className = 'battery-cell';
         c.dataset.idx = String(i);
-        // each cell's "zone" by position
+        // each cell's "zone" by position — same 4-tier banding as the gauge
         const cellT = i / SEGMENTS;
-        c.dataset.zone = cellT < 0.30 ? 'low' : cellT < 0.70 ? 'mid' : 'high';
+        c.dataset.zone = cellT < 0.20 ? 'low'
+                       : cellT < 0.40 ? 'warn'
+                       : cellT < 0.70 ? 'mid'
+                       : 'high';
         frame.appendChild(c);
       }
     }
@@ -539,7 +554,11 @@
       digits.textContent = v;
       ghost.textContent  = '8'.repeat(v.length);
       const z = socZone(soc);
-      const colorClass = z === 'low' ? 'soc-red' : z === 'high' ? 'soc-green' : 'soc-amber';
+      const colorClass =
+          z === 'low'  ? 'soc-red'
+        : z === 'warn' ? 'soc-amber'
+        : z === 'high' ? 'soc-green'
+        :                'soc-cyan';
       digits.setAttribute('class', `soc-svg-text ${colorClass}`);
       ghost.setAttribute('class',  `soc-svg-text soc-ghost ${z}`);
     }
