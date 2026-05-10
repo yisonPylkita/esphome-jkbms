@@ -73,11 +73,12 @@ if [ "$INSTALL_ESPHOME" = "1" ]; then
     info "creating Python venv at .venv/"
     python3 -m venv .venv
   fi
-  info "upgrading pip + installing/upgrading esphome + ruff (this can take a minute)"
+  info "upgrading pip + installing dev deps from requirements-dev.txt (this can take a minute)"
   .venv/bin/pip install --quiet --upgrade pip
   # esphome → firmware config validation; ruff → Python formatter/linter
-  # used by `just fmt` and `just check`.
-  .venv/bin/pip install --quiet --upgrade esphome ruff
+  # used by `just fmt` and `just check`. Pinned in requirements-dev.txt
+  # so this is reproducible and matches what CI uses.
+  .venv/bin/pip install --quiet --upgrade -r requirements-dev.txt
   ok ".venv/bin/esphome ready ($(.venv/bin/esphome version 2>&1 | head -n1))"
   ok ".venv/bin/ruff ready ($(.venv/bin/ruff --version 2>&1 | head -n1))"
 else

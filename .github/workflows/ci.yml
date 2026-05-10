@@ -11,21 +11,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # actions/setup-python's built-in pip cache keys off requirements*.txt,
+      # so pinning our two dev deps there gives us cache hits on every
+      # run where the file hasn't changed.
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements-dev.txt
 
+      # Same idea for npm — setup-node hashes package-lock.json under the
+      # hood and restores the npm cache, so `npm ci` is ~instant on a hit.
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
       - name: Install esphome + ruff
         run: |
           python -m pip install --upgrade pip
-          pip install esphome ruff
+          pip install -r requirements-dev.txt
 
+      # `npm ci` is the CI-friendly counterpart of `npm install`: it refuses
+      # to mutate package-lock.json, fails on drift, and is faster from a
+      # warm cache than `install`.
       - name: Install npm dev deps (prettier)
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: just fmt-check (prettier + ruff)
         run: bash scripts/fmt.sh --check

@@ -1,0 +1,9 @@
+# Dev / CI Python deps. Installed by `scripts/setup.sh` into `.venv/`
+# and by `.github/workflows/ci.yml` into the workflow runner.
+#
+# Pinned so CI is reproducible and so `actions/setup-python`'s built-in
+# pip cache has a stable hash to key on. Bump explicitly when you want
+# new versions.
+
+esphome==2026.4.5
+ruff==0.15.12
