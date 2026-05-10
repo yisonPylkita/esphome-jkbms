@@ -139,10 +139,10 @@ The script:
 
 URLs once deployed:
 
-| Page | URL |
-|---|---|
-| Main | `http://<ha>:8123/local/bms-integrated.html` |
-| Diagnostic (history, cells, raw JSON) | `http://<ha>:8123/local/bms-dashboard.html` |
+| Page                                  | URL                                          |
+| ------------------------------------- | -------------------------------------------- |
+| Main                                  | `http://<ha>:8123/local/bms-integrated.html` |
+| Diagnostic (history, cells, raw JSON) | `http://<ha>:8123/local/bms-dashboard.html`  |
 
 Press **A** on either page to swap to the other.
 

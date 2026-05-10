@@ -87,10 +87,10 @@ function stepAlarm(ctx) {
       // Persisted in HA `input_text.alarm_trigger_reason` as well — keys
       // are language-stable, human strings drift.
       const reasons = [];
-      if (door)            reasons.push('door');
-      if (ctx.motionMain)  reasons.push('motion_main');
-      if (ctx.motionAux)   reasons.push('motion_aux');
-      if (reasons.length)  set('triggered', reasons.join(' · '));
+      if (door) reasons.push('door');
+      if (ctx.motionMain) reasons.push('motion_main');
+      if (ctx.motionAux) reasons.push('motion_aux');
+      if (reasons.length) set('triggered', reasons.join(' · '));
       break;
     }
     case 'triggered': {
@@ -106,7 +106,7 @@ function stepAlarm(ctx) {
   let sirenOn = false;
   if (state === 'triggered') {
     const sirenMs = (ctx.sirenDurationS || 60) * 1000;
-    sirenOn = (ctx.now - stateSince) < sirenMs;
+    sirenOn = ctx.now - stateSince < sirenMs;
   }
 
   return {

@@ -6,8 +6,8 @@ const { T, t, getLang, setLang } = require('../dashboard/lib/i18n.js');
 test('every PL key has an EN counterpart and vice versa', () => {
   const pl = Object.keys(T.pl).sort();
   const en = Object.keys(T.en).sort();
-  const onlyInPl = pl.filter(k => !T.en[k]);
-  const onlyInEn = en.filter(k => !T.pl[k]);
+  const onlyInPl = pl.filter((k) => !T.en[k]);
+  const onlyInEn = en.filter((k) => !T.pl[k]);
   assert.deepStrictEqual(onlyInPl, [], `PL has keys missing in EN: ${onlyInPl.join(', ')}`);
   assert.deepStrictEqual(onlyInEn, [], `EN has keys missing in PL: ${onlyInEn.join(', ')}`);
 });
@@ -20,9 +20,9 @@ test('default lang is pl (no DOM in Node)', () => {
 test('setLang switches lookups; unknown lang ignored', () => {
   setLang('en');
   assert.strictEqual(t('alarm.btnArm'), 'ARM');
-  setLang('zz');                       // unknown — must keep current
+  setLang('zz'); // unknown — must keep current
   assert.strictEqual(t('alarm.btnArm'), 'ARM');
-  setLang('pl');                       // restore for other tests
+  setLang('pl'); // restore for other tests
 });
 
 test('positional {0}/{1} substitution', () => {
@@ -33,10 +33,10 @@ test('positional {0}/{1} substitution', () => {
 
 test('cause keys translate to user strings in both languages', () => {
   setLang('pl');
-  assert.strictEqual(t('alarm.cause.door'),        'otwarcie drzwi');
+  assert.strictEqual(t('alarm.cause.door'), 'otwarcie drzwi');
   assert.strictEqual(t('alarm.cause.motion_main'), 'ruch (główny)');
   setLang('en');
-  assert.strictEqual(t('alarm.cause.door'),        'door opened');
+  assert.strictEqual(t('alarm.cause.door'), 'door opened');
   assert.strictEqual(t('alarm.cause.motion_main'), 'motion (main)');
   setLang('pl');
 });

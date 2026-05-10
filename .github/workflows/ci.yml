@@ -19,10 +19,16 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install esphome
+      - name: Install esphome + ruff
         run: |
           python -m pip install --upgrade pip
-          pip install esphome
+          pip install esphome ruff
+
+      - name: Install npm dev deps (prettier)
+        run: npm install --no-audit --no-fund
+
+      - name: just fmt-check (prettier + ruff)
+        run: bash scripts/fmt.sh --check
 
       # secrets.yaml is gitignored — synthesise a minimal stub so esphome
       # can resolve `!secret` references during `esphome config`. Values

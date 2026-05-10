@@ -196,7 +196,7 @@ text_sensor:
       name: "inverter mode"
     last_qpigs:
       name: "last qpigs raw"
-      internal: true        # debugging — toggle false to expose
+      internal: true # debugging — toggle false to expose
     last_qpiri:
       name: "last qpiri raw"
       internal: true

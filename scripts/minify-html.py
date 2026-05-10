@@ -13,6 +13,7 @@ contained (no 404s, no extra round-trips on slow phone connections).
 
 Usage:  python3 minify-html.py [--source-dir DIR] < input.html > output.html
 """
+
 import argparse
 import os
 import re
@@ -49,7 +50,9 @@ def minify_js(js: str) -> str:
 
 
 _STYLE_RE = re.compile(r"(<style[^>]*>)(.*?)(</style>)", re.DOTALL)
-_SCRIPT_INLINE_RE = re.compile(r"(<script(?![^>]*\bsrc=)[^>]*>)(.*?)(</script>)", re.DOTALL)
+_SCRIPT_INLINE_RE = re.compile(
+    r"(<script(?![^>]*\bsrc=)[^>]*>)(.*?)(</script>)", re.DOTALL
+)
 _SCRIPT_SRC_RE = re.compile(r"<script[^>]*\bsrc=\"([^\"]+)\"[^>]*>\s*</script>")
 # Stylesheet `<link>` tag matched as a whole element so we can replace the
 # entire tag (link is void — has no closing tag, just the leading `<link ... />`).
@@ -72,15 +75,19 @@ def inline_external_scripts(html: str, source_dir: str) -> str:
     Deployed HTML stays single-file. Source HTML still uses external scripts
     so editor tooling and Node tests can address them as standalone files.
     """
+
     def replace(match):
         rel = match.group(1)
         path = os.path.normpath(os.path.join(source_dir, rel))
         if not os.path.isfile(path):
-            sys.stderr.write(f"[minify] WARN: <script src=\"{rel}\"> -> {path} not found, leaving as-is\n")
+            sys.stderr.write(
+                f'[minify] WARN: <script src="{rel}"> -> {path} not found, leaving as-is\n'
+            )
             return match.group(0)
         with open(path, "r", encoding="utf-8") as fh:
             body = fh.read()
         return f"<script>{minify_js(body)}</script>"
+
     return _SCRIPT_SRC_RE.sub(replace, html)
 
 
@@ -90,15 +97,19 @@ def inline_external_stylesheets(html: str, source_dir: str) -> str:
     Same rationale as inline_external_scripts — source-side files are
     composable, deployed HTML is single-file.
     """
+
     def replace(match):
         rel = match.group(1)
         path = os.path.normpath(os.path.join(source_dir, rel))
         if not os.path.isfile(path):
-            sys.stderr.write(f"[minify] WARN: <link href=\"{rel}\"> -> {path} not found, leaving as-is\n")
+            sys.stderr.write(
+                f'[minify] WARN: <link href="{rel}"> -> {path} not found, leaving as-is\n'
+            )
             return match.group(0)
         with open(path, "r", encoding="utf-8") as fh:
             body = fh.read()
         return f"<style>{minify_css(body)}</style>"
+
     return _LINK_CSS_RE.sub(replace, html)
 
 
@@ -110,12 +121,14 @@ def flatten_icon_paths(html: str) -> str:
     flattens everything into `/config/www/`, so the icon should sit
     next to the deployed HTML and be referenced as a bare filename.
     """
+
     def replace(m):
         head, href, tail = m.group(1), m.group(2), m.group(3)
         # only flatten relative paths that climb one folder up
         if href.startswith("../"):
             href = href[3:]
         return f"{head}{href}{tail}"
+
     return _LINK_ICON_RE.sub(replace, html)
 
 
@@ -136,9 +149,12 @@ def minify_html(html: str, source_dir: str = ".") -> str:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--source-dir", default=".",
-                   help="Directory containing the source HTML — used as base "
-                        "for resolving <script src=\"...\"> paths. Defaults "
-                        "to the current working directory.")
+    p.add_argument(
+        "--source-dir",
+        default=".",
+        help="Directory containing the source HTML — used as base "
+        'for resolving <script src="..."> paths. Defaults '
+        "to the current working directory.",
+    )
     args = p.parse_args()
     sys.stdout.write(minify_html(sys.stdin.read(), source_dir=args.source_dir))

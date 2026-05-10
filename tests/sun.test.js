@@ -18,9 +18,9 @@ test('sunTimesFor — Warsaw rise/set within 20 min of reference', () => {
   for (const [noon, ref_rise, ref_set] of REF) {
     const { sunrise, sunset } = sunTimesFor(new Date(noon), WARSAW_LAT, WARSAW_LON);
     const dRise = Math.abs(sunrise.getTime() - new Date(ref_rise).getTime()) / 60000;
-    const dSet  = Math.abs(sunset.getTime()  - new Date(ref_set).getTime())  / 60000;
+    const dSet = Math.abs(sunset.getTime() - new Date(ref_set).getTime()) / 60000;
     assert.ok(dRise < 20, `${noon}: sunrise off by ${dRise.toFixed(1)} min`);
-    assert.ok(dSet  < 20, `${noon}: sunset  off by ${dSet.toFixed(1)} min`);
+    assert.ok(dSet < 20, `${noon}: sunset  off by ${dSet.toFixed(1)} min`);
   }
 });
 
@@ -39,7 +39,7 @@ test('nightIntervals — 24 h window contains exactly one night', () => {
   // Each night ends at sunrise, starts at sunset — must lie inside [start,end]
   for (const n of nights) {
     assert.ok(n.start >= start && n.start < end);
-    assert.ok(n.end   >  start && n.end   <= end);
+    assert.ok(n.end > start && n.end <= end);
     assert.ok(n.end > n.start);
   }
 });

@@ -73,10 +73,13 @@ if [ "$INSTALL_ESPHOME" = "1" ]; then
     info "creating Python venv at .venv/"
     python3 -m venv .venv
   fi
-  info "upgrading pip + installing/upgrading esphome (this can take a minute)"
+  info "upgrading pip + installing/upgrading esphome + ruff (this can take a minute)"
   .venv/bin/pip install --quiet --upgrade pip
-  .venv/bin/pip install --quiet --upgrade esphome
+  # esphome → firmware config validation; ruff → Python formatter/linter
+  # used by `just fmt` and `just check`.
+  .venv/bin/pip install --quiet --upgrade esphome ruff
   ok ".venv/bin/esphome ready ($(.venv/bin/esphome version 2>&1 | head -n1))"
+  ok ".venv/bin/ruff ready ($(.venv/bin/ruff --version 2>&1 | head -n1))"
 else
   info "skipping Python/esphome setup (--no-esphome)"
 fi
@@ -114,6 +117,22 @@ if [ "$INSTALL_NODE" = "1" ]; then
   fi
 else
   info "skipping Node.js setup (--no-node)"
+fi
+
+# ---------- 3b. npm dev deps (prettier) ----------
+if [ "$INSTALL_NODE" = "1" ]; then
+  # Pick the npm we'll use — the one paired with the node we'll actually
+  # call from CI / Just (`.tools/bin/npm` if we just downloaded one,
+  # otherwise system npm).
+  if [ -x ".tools/bin/npm" ]; then NPM=".tools/bin/npm"
+  elif command -v npm >/dev/null 2>&1; then NPM="npm"
+  else NPM=""
+  fi
+  if [ -n "$NPM" ] && [ -f package.json ]; then
+    info "installing npm dev deps (prettier) via $NPM"
+    "$NPM" install --silent --no-audit --no-fund
+    ok "node_modules/.bin/prettier ready ($(./node_modules/.bin/prettier --version))"
+  fi
 fi
 
 # ---------- 4. secrets.yaml ----------

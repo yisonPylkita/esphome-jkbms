@@ -3,7 +3,7 @@
 // Battery runtime prediction — pure functions, testable from Node. Included
 // in the browser at deploy time by scripts/minify-html.py.
 
-const POWER_DEAD_W = 5;        // idle threshold (W)
+const POWER_DEAD_W = 5; // idle threshold (W)
 
 // Linear projection. Sustained 1 h mean power is treated as the constant
 // forward rate. Returns when the pack would hit empty (0 %) or full (100 %)
@@ -12,7 +12,8 @@ const POWER_DEAD_W = 5;        // idle threshold (W)
 //
 // `now` defaults to Date.now() for production use; tests can pin it.
 function predictLinear(socPct, capacityFullWh, avgPowerW, now = Date.now()) {
-  if (!Number.isFinite(socPct) || !Number.isFinite(capacityFullWh) || capacityFullWh <= 0) return null;
+  if (!Number.isFinite(socPct) || !Number.isFinite(capacityFullWh) || capacityFullWh <= 0)
+    return null;
   if (!Number.isFinite(avgPowerW) || Math.abs(avgPowerW) < POWER_DEAD_W) return null;
   const energyWh = (socPct / 100) * capacityFullWh;
   let secs;
@@ -38,14 +39,15 @@ function predictLinear(socPct, capacityFullWh, avgPowerW, now = Date.now()) {
 function fmtPredictionParts(d, now = new Date(), opts = {}) {
   const { locale = 'pl-PL', today = 'Dziś', tomorrow = 'Jutro' } = opts;
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dayKey = (x) => Math.floor((new Date(x.getFullYear(), x.getMonth(), x.getDate()) - startOfToday) / 86400000);
+  const dayKey = (x) =>
+    Math.floor((new Date(x.getFullYear(), x.getMonth(), x.getDate()) - startOfToday) / 86400000);
   const k = dayKey(d);
   const hhmm = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   let day;
-  if      (k === 0) day = today;
+  if (k === 0) day = today;
   else if (k === 1) day = tomorrow;
-  else if (k <= 6)  day = d.toLocaleDateString(locale, { weekday: 'short' });
-  else              day = d.toLocaleDateString(locale, { day: '2-digit', month: 'short' });
+  else if (k <= 6) day = d.toLocaleDateString(locale, { weekday: 'short' });
+  else day = d.toLocaleDateString(locale, { day: '2-digit', month: 'short' });
   return { hhmm, day };
 }
 
@@ -54,4 +56,5 @@ function roundToGrain(d, grainMin) {
   return new Date(Math.round(d.getTime() / ms) * ms);
 }
 
-if (typeof module !== 'undefined') module.exports = { POWER_DEAD_W, predictLinear, fmtPredictionParts, roundToGrain };
+if (typeof module !== 'undefined')
+  module.exports = { POWER_DEAD_W, predictLinear, fmtPredictionParts, roundToGrain };

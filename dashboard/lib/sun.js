@@ -13,26 +13,28 @@ const WARSAW_LON = 21.0122;
 
 function sunTimesFor(date, lat, lng) {
   const J2000 = 2451545.0;
-  const lw = -lng * Math.PI / 180;        // west longitude (radians)
-  const phi = lat * Math.PI / 180;        // latitude (radians)
+  const lw = (-lng * Math.PI) / 180; // west longitude (radians)
+  const phi = (lat * Math.PI) / 180; // latitude (radians)
   const d = date.getTime() / 86400000 - 0.5 + 2440587.5 - J2000;
   const n = Math.round(d - 0.0009 - lw / (2 * Math.PI));
   const ds = 0.0009 + lw / (2 * Math.PI) + n;
-  const M = (357.5291 + 0.98560028 * ds) * Math.PI / 180;
-  const C = (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M)) * Math.PI / 180;
-  const L = M + C + Math.PI + 102.9372 * Math.PI / 180;
+  const M = ((357.5291 + 0.98560028 * ds) * Math.PI) / 180;
+  const C =
+    ((1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M)) * Math.PI) / 180;
+  const L = M + C + Math.PI + (102.9372 * Math.PI) / 180;
   const Jnoon = J2000 + ds + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
-  const dec = Math.asin(Math.sin(L) * Math.sin(23.4397 * Math.PI / 180));
-  const cosH = (Math.sin(-0.83 * Math.PI / 180) - Math.sin(phi) * Math.sin(dec)) /
-               (Math.cos(phi) * Math.cos(dec));
+  const dec = Math.asin(Math.sin(L) * Math.sin((23.4397 * Math.PI) / 180));
+  const cosH =
+    (Math.sin((-0.83 * Math.PI) / 180) - Math.sin(phi) * Math.sin(dec)) /
+    (Math.cos(phi) * Math.cos(dec));
   if (cosH < -1 || cosH > 1) return { sunrise: null, sunset: null };
   const H = Math.acos(cosH);
   const dsSet = 0.0009 + (H + lw) / (2 * Math.PI) + n;
-  const Jset  = J2000 + dsSet + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
+  const Jset = J2000 + dsSet + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
   const Jrise = Jnoon - (Jset - Jnoon);
   return {
     sunrise: new Date((Jrise - 2440587.5) * 86400000),
-    sunset:  new Date((Jset  - 2440587.5) * 86400000),
+    sunset: new Date((Jset - 2440587.5) * 86400000),
   };
 }
 
@@ -57,4 +59,5 @@ function nightIntervals(startMs, endMs, lat, lon) {
   return out;
 }
 
-if (typeof module !== 'undefined') module.exports = { WARSAW_LAT, WARSAW_LON, sunTimesFor, nightIntervals };
+if (typeof module !== 'undefined')
+  module.exports = { WARSAW_LAT, WARSAW_LON, sunTimesFor, nightIntervals };

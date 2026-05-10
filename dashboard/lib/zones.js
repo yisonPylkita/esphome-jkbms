@@ -11,9 +11,9 @@
 //   high ≥ 70%   green  — well charged
 
 function tickFillColor(t) {
-  if (t < 0.20) return 'var(--bms-red)';
-  if (t < 0.40) return 'var(--bms-amber)';
-  if (t < 0.70) return 'var(--bms-cyan)';
+  if (t < 0.2) return 'var(--bms-red)';
+  if (t < 0.4) return 'var(--bms-amber)';
+  if (t < 0.7) return 'var(--bms-cyan)';
   return 'var(--bms-green)';
 }
 

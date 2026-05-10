@@ -14,6 +14,16 @@ cd "$HERE"
 ok()   { printf '\033[32m✓\033[0m %s\n' "$1"; }
 fail() { printf '\033[31m✗\033[0m %s\n' "$1" >&2; exit 1; }
 
+# 0. Formatting — prettier (JS/CSS/HTML/JSON/YAML/MD) + ruff (Python).
+#    Skipped if the toolchain isn't installed (e.g. lean CI container) so
+#    contributors aren't forced to run `npm install` to do a syntax check.
+if [ -x node_modules/.bin/prettier ] || [ -x .venv/bin/ruff ]; then
+  bash scripts/fmt.sh --check >/dev/null || fail "formatter (run \`just fmt\`)"
+  ok "format gates pass (prettier + ruff)"
+else
+  printf '\033[33m·\033[0m formatter tooling absent; run scripts/setup.sh to enable\n'
+fi
+
 # 1. Shell syntax — every .sh under scripts/.
 for f in scripts/*.sh; do
   /bin/bash -n "$f" || fail "bash syntax: $f"

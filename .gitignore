@@ -9,6 +9,10 @@ __pycache__/
 # Tooling installed by scripts/setup.sh (Node.js binary, etc.)
 .tools/
 
+# npm dev dependencies (prettier) — pulled by `scripts/setup.sh`, not
+# committed. package-lock.json IS committed so checkouts are reproducible.
+node_modules/
+
 # Lighthouse / audit / report artefacts — keep them out of source.
 *.pdf
 

@@ -1,0 +1,24 @@
+# Vendored / generated / not source.
+.venv/
+.tools/
+node_modules/
+syssi/
+.git/
+
+# Build outputs we never commit.
+/tmp/
+dashboard/*.local.html
+*.local.html
+
+# Auto-managed by Node-RED's editor — we patch this file with surgical
+# Python scripts that keep its JSON shape stable. Letting prettier rewrite
+# every key forces gratuitous diffs on every commit.
+node-red/*.flow.json
+
+# Secrets — keep formatting changes off the file so credentials don't
+# accidentally land in PR diffs.
+secrets.yaml
+inverter/secrets.yaml
+
+# Vendored font assets.
+dashboard/fonts/

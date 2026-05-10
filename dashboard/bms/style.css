@@ -1,327 +1,508 @@
-    @font-face {
-      font-family: "DSEG7Modern";
-      font-display: swap;
-      src: url("/local/fonts/DSEG7Modern-Bold.woff2") format("woff2");
-    }
+@font-face {
+  font-family: 'DSEG7Modern';
+  font-display: swap;
+  src: url('/local/fonts/DSEG7Modern-Bold.woff2') format('woff2');
+}
 
-    /* Design tokens — verbatim from bms.css. */
-    :root {
-      --seg-font: "DSEG7Modern", monospace;
-      --bms-bg: #000000;
-      --bms-cyan: #38c8ff;
-      --bms-cyan-glow: transparent;
-      --bms-cyan-dim: rgba(56, 200, 255, 0.18);
-      --bms-cyan-off: rgba(56, 200, 255, 0.08);
-      --bms-red: #ff2e3d;
-      --bms-red-glow: transparent;
-      --bms-red-dim: rgba(255, 46, 61, 0.16);
-      --bms-green: #1bff7c;
-      --bms-green-glow: transparent;
-      --bms-green-dim: rgba(27, 255, 124, 0.16);
-      --bms-amber: #ffb200;
-      --bms-amber-glow: transparent;
-      --bms-amber-dim: rgba(255, 178, 0, 0.16);
-      --bms-mute: #6b7280;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body {
-      height: 100%; background: var(--bms-bg); color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased; overflow: hidden;
-      user-select: none; -webkit-user-select: none;
-    }
-    .seg {
-      font-family: var(--seg-font);
-      font-weight: 700; letter-spacing: 0.04em;
-      font-variant-numeric: tabular-nums;
-    }
-    .cap {
-      font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
-      font-weight: 500; letter-spacing: 0.12em;
-      text-transform: uppercase; font-size: 11px;
-      color: var(--bms-mute);
-    }
+/* Design tokens — verbatim from bms.css. */
+:root {
+  --seg-font: 'DSEG7Modern', monospace;
+  --bms-bg: #000000;
+  --bms-cyan: #38c8ff;
+  --bms-cyan-glow: transparent;
+  --bms-cyan-dim: rgba(56, 200, 255, 0.18);
+  --bms-cyan-off: rgba(56, 200, 255, 0.08);
+  --bms-red: #ff2e3d;
+  --bms-red-glow: transparent;
+  --bms-red-dim: rgba(255, 46, 61, 0.16);
+  --bms-green: #1bff7c;
+  --bms-green-glow: transparent;
+  --bms-green-dim: rgba(27, 255, 124, 0.16);
+  --bms-amber: #ffb200;
+  --bms-amber-glow: transparent;
+  --bms-amber-dim: rgba(255, 178, 0, 0.16);
+  --bms-mute: #6b7280;
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body {
+  height: 100%;
+  background: var(--bms-bg);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.seg {
+  font-family: var(--seg-font);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.cap {
+  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--bms-mute);
+}
 
-    /* Screen frame — flex column distributes extra vertical space evenly
+/* Screen frame — flex column distributes extra vertical space evenly
        between rows instead of dumping it under the top bar. Gauge slot
        gets its size from aspect-ratio (100/62 matches viewBox). */
-    /* Use dynamic viewport units (dvh/dvw) so the panel is always sized to
+/* Use dynamic viewport units (dvh/dvw) so the panel is always sized to
        what's actually visible — no overflow when the browser chrome shows.
        Sizing tokens further down are all in vh / vmin / dvh so nothing
        fixed in pixels can push the panel taller than the viewport. */
-    .bms-screen {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 100dvh;
-      padding:
-        max(2dvh, env(safe-area-inset-top))
-        max(2dvh, env(safe-area-inset-right))
-        max(2dvh, env(safe-area-inset-bottom))
-        max(2dvh, env(safe-area-inset-left));
-      background: var(--bms-bg);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: stretch;
-      gap: 1.6dvh;
-      max-width: min(1100px, 92vw);
-      margin: 0 auto;
-      overflow: hidden;
-    }
-    /* On landscape (≥ 5/4 aspect) drop the width cap and tighten top padding
+.bms-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
+  padding: max(2dvh, env(safe-area-inset-top)) max(2dvh, env(safe-area-inset-right))
+    max(2dvh, env(safe-area-inset-bottom)) max(2dvh, env(safe-area-inset-left));
+  background: var(--bms-bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 1.6dvh;
+  max-width: min(1100px, 92vw);
+  margin: 0 auto;
+  overflow: hidden;
+}
+/* On landscape (≥ 5/4 aspect) drop the width cap and tighten top padding
        so the gauge can expand to the full viewport width AND height. */
-    @media (min-aspect-ratio: 5/4) {
-      .bms-screen {
-        max-width: none;
-        padding-top: max(0.6dvh, env(safe-area-inset-top));
-      }
-    }
-    .bms-screen::after {
-      content: ""; position: absolute; inset: 0; pointer-events: none;
-      background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
-      mix-blend-mode: screen; opacity: 0.7;
-    }
+@media (min-aspect-ratio: 5/4) {
+  .bms-screen {
+    max-width: none;
+    padding-top: max(0.6dvh, env(safe-area-inset-top));
+  }
+}
+.bms-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.012) 0 1px,
+    transparent 1px 3px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.7;
+}
 
-    /* Lost-connection overlay — centred along the top edge so it doesn't
+/* Lost-connection overlay — centred along the top edge so it doesn't
        collide with the absolute voltage/temperature topbar in the corners.
        Shows when the BMS hasn't sent fresh data in the last 5 s. */
-    .stale {
-      position: fixed;
-      top: max(12px, env(safe-area-inset-top));
-      left: 50%; transform: translateX(-50%);
-      padding: 8px 12px;
-      background: rgba(255, 46, 61, 0.18);
-      border: 1px solid var(--bms-red);
-      border-radius: 8px;
-      color: var(--bms-red);
-      text-shadow: 0 0 10px var(--bms-red-glow);
-      font-family: ui-monospace, "JetBrains Mono", monospace;
-      font-weight: 700; letter-spacing: 0.1em;
-      font-size: clamp(11px, 1.6dvh, 16px);
-      display: flex; align-items: center; gap: 8px;
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.25s ease;
-      z-index: 100;
-    }
-    .stale.visible { opacity: 1; pointer-events: auto; }
-    .stale .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--bms-red);
-      box-shadow: 0 0 8px var(--bms-red-glow);
-      animation: bms-pulse 1.2s ease-in-out infinite;
-    }
+.stale {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  background: rgba(255, 46, 61, 0.18);
+  border: 1px solid var(--bms-red);
+  border-radius: 8px;
+  color: var(--bms-red);
+  text-shadow: 0 0 10px var(--bms-red-glow);
+  font-family: ui-monospace, 'JetBrains Mono', monospace;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-size: clamp(11px, 1.6dvh, 16px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 100;
+}
+.stale.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.stale .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bms-red);
+  box-shadow: 0 0 8px var(--bms-red-glow);
+  animation: bms-pulse 1.2s ease-in-out infinite;
+}
 
-    /* TopBar — voltage left, temperature right, both at the same baseline.
+/* TopBar — voltage left, temperature right, both at the same baseline.
        In portrait it stays in the column flex flow (default). In landscape
        it lifts to an absolute overlay layer so the gauge can claim the full
        upper-viewport area; voltage/temperature anchor in the top corners,
        which never collide visually with the half-circle gauge in the centre. */
-    .topbar {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 0 24px;
-    }
-    @media (min-aspect-ratio: 5/4) {
-      .topbar {
-        position: absolute;
-        top: max(8px, env(safe-area-inset-top));
-        left: 0; right: 0;
-        padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
-        pointer-events: none;
-        z-index: 5;
-      }
-      /* Battery bar & twin row stay legible on wide laptops by re-applying
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+}
+@media (min-aspect-ratio: 5/4) {
+  .topbar {
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top));
+    left: 0;
+    right: 0;
+    padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+    pointer-events: none;
+    z-index: 5;
+  }
+  /* Battery bar & twin row stay legible on wide laptops by re-applying
          a width cap of their own — the gauge between them spans full width. */
-      .battery-bar, .bottom-row {
-        max-width: min(1100px, 92vw);
-        margin-left: auto; margin-right: auto;
-        width: 100%;
-      }
-    }
-    /* Topbar sizing — modest in portrait (cells share a narrow row in flex
+  .battery-bar,
+  .bottom-row {
+    max-width: min(1100px, 92vw);
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+}
+/* Topbar sizing — modest in portrait (cells share a narrow row in flex
        flow), generous in landscape (absolute overlay with empty corners). */
-    .top-cell { display: flex; align-items: center; gap: 14px; }
-    .top-num {
-      font-size: clamp(28px, 7.5dvh, 8.4vw); line-height: 1;
-      color: var(--bms-cyan); text-shadow: 0 0 10px var(--bms-cyan-glow);
-    }
-    .top-num.warn  { color: var(--bms-red);   text-shadow: 0 0 10px var(--bms-red-glow); }
-    .top-num.alert { color: var(--bms-amber); text-shadow: 0 0 10px var(--bms-amber-glow); }
-    .top-unit {
-      color: var(--bms-cyan);
-      font-size: clamp(15px, 3.4dvh, 3.6vw); font-weight: 600; letter-spacing: 0.06em;
-      line-height: 1;
-      transform: translateY(2px);
-    }
-    .top-num.warn  + .top-unit { color: var(--bms-red); }
-    .top-num.alert + .top-unit { color: var(--bms-amber); }
-    .icon { width: clamp(24px, 5.6dvh, 5.6vw); height: clamp(24px, 5.6dvh, 5.6vw); flex: 0 0 auto; }
-    @media (min-aspect-ratio: 5/4) {
-      .top-cell { gap: 18px; }
-      .top-num  { font-size: clamp(36px, 10dvh, 9vw); }
-      .top-unit { font-size: clamp(18px, 4.2dvh, 4vw); transform: translateY(3px); }
-      .icon     { width: clamp(30px, 7dvh, 7vw); height: clamp(30px, 7dvh, 7vw); }
-    }
+.top-cell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.top-num {
+  font-size: clamp(28px, 7.5dvh, 8.4vw);
+  line-height: 1;
+  color: var(--bms-cyan);
+  text-shadow: 0 0 10px var(--bms-cyan-glow);
+}
+.top-num.warn {
+  color: var(--bms-red);
+  text-shadow: 0 0 10px var(--bms-red-glow);
+}
+.top-num.alert {
+  color: var(--bms-amber);
+  text-shadow: 0 0 10px var(--bms-amber-glow);
+}
+.top-unit {
+  color: var(--bms-cyan);
+  font-size: clamp(15px, 3.4dvh, 3.6vw);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  transform: translateY(2px);
+}
+.top-num.warn + .top-unit {
+  color: var(--bms-red);
+}
+.top-num.alert + .top-unit {
+  color: var(--bms-amber);
+}
+.icon {
+  width: clamp(24px, 5.6dvh, 5.6vw);
+  height: clamp(24px, 5.6dvh, 5.6vw);
+  flex: 0 0 auto;
+}
+@media (min-aspect-ratio: 5/4) {
+  .top-cell {
+    gap: 18px;
+  }
+  .top-num {
+    font-size: clamp(36px, 10dvh, 9vw);
+  }
+  .top-unit {
+    font-size: clamp(18px, 4.2dvh, 4vw);
+    transform: translateY(3px);
+  }
+  .icon {
+    width: clamp(30px, 7dvh, 7vw);
+    height: clamp(30px, 7dvh, 7vw);
+  }
+}
 
-    /* Gauge slot — by default takes width-driven natural size (good for
+/* Gauge slot — by default takes width-driven natural size (good for
        narrow / portrait viewports where the gauge is constrained by width
        anyway). On landscape (≥ 5/4 aspect) we let it flex-grow to consume
        the available height: the absolute topbar floats over it, so the
        gauge can claim the entire upper-viewport area. Voltage/temperature
        sit in the corners; the speedometer arc stays in the centred rounded
        region, so visible content doesn't collide even if bounding boxes do. */
-    .gauge-slot {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 100 / 49;
-      align-self: center;
-      flex: 0 0 auto;
-      max-width: 100%;
-    }
-    .gauge-svg {
-      display: block;
-      width: 100%; height: 100%;
-    }
-    @media (min-aspect-ratio: 5/4) {
-      .gauge-slot {
-        flex: 1 1 0;
-        min-height: 0;
-        align-self: stretch;
-        width: auto;
-        aspect-ratio: auto;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      .gauge-svg {
-        height: 100%;
-        width: auto;
-        max-width: 100%;
-        aspect-ratio: 100 / 49;
-      }
-    }
-    /* SOC readout lives inside the SVG so it scales with the viewBox. */
-    .soc-svg-text {
-      font-family: var(--seg-font);
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-    .soc-amber  { fill: var(--bms-amber); filter: drop-shadow(0 0 4px var(--bms-amber-glow)); }
-    .soc-red    { fill: var(--bms-red);   filter: drop-shadow(0 0 4px var(--bms-red-glow)); }
-    .soc-cyan   { fill: var(--bms-cyan);  filter: drop-shadow(0 0 4px var(--bms-cyan-glow)); }
-    .soc-green  { fill: var(--bms-green); filter: drop-shadow(0 0 4px var(--bms-green-glow)); }
-    .soc-ghost  { fill: var(--bms-cyan); opacity: 0.07; filter: none; }
-    .soc-ghost.low  { fill: var(--bms-red); }
-    .soc-ghost.warn { fill: var(--bms-amber); }
-    .soc-ghost.high { fill: var(--bms-green); }
+.gauge-slot {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 100 / 49;
+  align-self: center;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+.gauge-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+@media (min-aspect-ratio: 5/4) {
+  .gauge-slot {
+    flex: 1 1 0;
+    min-height: 0;
+    align-self: stretch;
+    width: auto;
+    aspect-ratio: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .gauge-svg {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    aspect-ratio: 100 / 49;
+  }
+}
+/* SOC readout lives inside the SVG so it scales with the viewBox. */
+.soc-svg-text {
+  font-family: var(--seg-font);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.soc-amber {
+  fill: var(--bms-amber);
+  filter: drop-shadow(0 0 4px var(--bms-amber-glow));
+}
+.soc-red {
+  fill: var(--bms-red);
+  filter: drop-shadow(0 0 4px var(--bms-red-glow));
+}
+.soc-cyan {
+  fill: var(--bms-cyan);
+  filter: drop-shadow(0 0 4px var(--bms-cyan-glow));
+}
+.soc-green {
+  fill: var(--bms-green);
+  filter: drop-shadow(0 0 4px var(--bms-green-glow));
+}
+.soc-ghost {
+  fill: var(--bms-cyan);
+  opacity: 0.07;
+  filter: none;
+}
+.soc-ghost.low {
+  fill: var(--bms-red);
+}
+.soc-ghost.warn {
+  fill: var(--bms-amber);
+}
+.soc-ghost.high {
+  fill: var(--bms-green);
+}
 
-    /* Battery bar — 12 cells, zone-tinted, with frame glow. */
-    .battery-bar {
-      display: flex; align-items: center; gap: 6px;
-      padding: 0 24px;
-    }
-    .battery-frame {
-      flex: 1; display: flex; gap: 4px;
-      padding: 6px;
-      border: 2px solid var(--bms-cyan);
-      border-radius: 6px;
-      box-shadow: 0 0 18px var(--bms-cyan-glow), inset 0 0 12px rgba(0,0,0,0.6);
-    }
-    .battery-frame.low  { border-color: var(--bms-red);   box-shadow: 0 0 18px var(--bms-red-glow),   inset 0 0 12px rgba(0,0,0,0.6); }
-    .battery-frame.warn { border-color: var(--bms-amber); box-shadow: 0 0 18px var(--bms-amber-glow), inset 0 0 12px rgba(0,0,0,0.6); }
-    .battery-frame.high { border-color: var(--bms-green); box-shadow: 0 0 18px var(--bms-green-glow), inset 0 0 12px rgba(0,0,0,0.6); }
-    .battery-cell {
-      flex: 1; height: clamp(20px, 6dvh, 6vw); border-radius: 3px;
-      background: rgba(255,255,255,0.04);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
-    }
-    .battery-cell.on-low  { background: var(--bms-red);   box-shadow: 0 0 8px var(--bms-red-glow),   inset 0 -2px 0 rgba(0,0,0,0.2); }
-    .battery-cell.on-warn { background: var(--bms-amber); box-shadow: 0 0 8px var(--bms-amber-glow), inset 0 -2px 0 rgba(0,0,0,0.2); }
-    .battery-cell.on-mid  { background: var(--bms-cyan);  box-shadow: 0 0 8px var(--bms-cyan-glow),  inset 0 -2px 0 rgba(0,0,0,0.2); }
-    .battery-cell.on-high { background: var(--bms-green); box-shadow: 0 0 8px var(--bms-green-glow), inset 0 -2px 0 rgba(0,0,0,0.2); }
-    .battery-nub {
-      width: 0.9vmin; min-width: 6px; height: clamp(14px, 4dvh, 4vw); border-radius: 2px;
-      background: var(--bms-cyan); box-shadow: 0 0 10px var(--bms-cyan-glow);
-    }
-    .battery-nub.low  { background: var(--bms-red);   box-shadow: 0 0 10px var(--bms-red-glow); }
-    .battery-nub.warn { background: var(--bms-amber); box-shadow: 0 0 10px var(--bms-amber-glow); }
-    .battery-nub.high { background: var(--bms-green); box-shadow: 0 0 10px var(--bms-green-glow); }
+/* Battery bar — 12 cells, zone-tinted, with frame glow. */
+.battery-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 24px;
+}
+.battery-frame {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border: 2px solid var(--bms-cyan);
+  border-radius: 6px;
+  box-shadow:
+    0 0 18px var(--bms-cyan-glow),
+    inset 0 0 12px rgba(0, 0, 0, 0.6);
+}
+.battery-frame.low {
+  border-color: var(--bms-red);
+  box-shadow:
+    0 0 18px var(--bms-red-glow),
+    inset 0 0 12px rgba(0, 0, 0, 0.6);
+}
+.battery-frame.warn {
+  border-color: var(--bms-amber);
+  box-shadow:
+    0 0 18px var(--bms-amber-glow),
+    inset 0 0 12px rgba(0, 0, 0, 0.6);
+}
+.battery-frame.high {
+  border-color: var(--bms-green);
+  box-shadow:
+    0 0 18px var(--bms-green-glow),
+    inset 0 0 12px rgba(0, 0, 0, 0.6);
+}
+.battery-cell {
+  flex: 1;
+  height: clamp(20px, 6dvh, 6vw);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.battery-cell.on-low {
+  background: var(--bms-red);
+  box-shadow:
+    0 0 8px var(--bms-red-glow),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+.battery-cell.on-warn {
+  background: var(--bms-amber);
+  box-shadow:
+    0 0 8px var(--bms-amber-glow),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+.battery-cell.on-mid {
+  background: var(--bms-cyan);
+  box-shadow:
+    0 0 8px var(--bms-cyan-glow),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+.battery-cell.on-high {
+  background: var(--bms-green);
+  box-shadow:
+    0 0 8px var(--bms-green-glow),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+.battery-nub {
+  width: 0.9vmin;
+  min-width: 6px;
+  height: clamp(14px, 4dvh, 4vw);
+  border-radius: 2px;
+  background: var(--bms-cyan);
+  box-shadow: 0 0 10px var(--bms-cyan-glow);
+}
+.battery-nub.low {
+  background: var(--bms-red);
+  box-shadow: 0 0 10px var(--bms-red-glow);
+}
+.battery-nub.warn {
+  background: var(--bms-amber);
+  box-shadow: 0 0 10px var(--bms-amber-glow);
+}
+.battery-nub.high {
+  background: var(--bms-green);
+  box-shadow: 0 0 10px var(--bms-green-glow);
+}
 
-    /* PowerReadout — centered single optical line. Signed digits + W. */
-    /* Bottom row — symmetric twin layout.
+/* PowerReadout — centered single optical line. Signed digits + W. */
+/* Bottom row — symmetric twin layout.
        Power on the left, runtime prediction on the right, equal weight.
        Each cell: tiny uppercase label on top, big seg-digits in the middle,
        small unit/day suffix on the right. Direction colour (charging / dis-
        charging / idle) applies uniformly to both cells. */
-    .bottom-row {
-      display: flex;
-      gap: clamp(16px, 4vw, 48px);
-      padding: 0 16px;
-      align-items: stretch;
-      justify-content: center;
-    }
-    .bottom-cell {
-      flex: 1 1 0; min-width: 0;
-      display: flex; flex-direction: column; align-items: center;
-      gap: clamp(2px, 0.6dvh, 6px);
-    }
-    .bottom-label {
-      font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
-      font-size: clamp(10px, 1.4dvh, 13px);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      opacity: 0.5;
-      white-space: nowrap;
-    }
-    .bottom-value {
-      display: inline-flex; align-items: baseline; gap: 10px;
-      font-family: var(--seg-font); line-height: 1;
-    }
-    .bottom-value .seg {
-      font-size: clamp(36px, 9dvh, 7vw);
-    }
-    .bottom-unit {
-      font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
-      font-size: clamp(13px, 2.6dvh, 22px);
-      font-weight: 600; letter-spacing: 0.06em;
-      opacity: 0.65; text-transform: uppercase;
-      transform: translateY(2px);
-    }
-    /* Direction colours applied uniformly across both cells. */
-    .bottom-cell.charging    { color: var(--bms-green); }
-    .bottom-cell.discharging { color: var(--bms-red); }
-    .bottom-cell.idle        { color: var(--bms-cyan); }
-    /* Phone-portrait: tighten the twin row so it fits without overflowing.
+.bottom-row {
+  display: flex;
+  gap: clamp(16px, 4vw, 48px);
+  padding: 0 16px;
+  align-items: stretch;
+  justify-content: center;
+}
+.bottom-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(2px, 0.6dvh, 6px);
+}
+.bottom-label {
+  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  font-size: clamp(10px, 1.4dvh, 13px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+.bottom-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--seg-font);
+  line-height: 1;
+}
+.bottom-value .seg {
+  font-size: clamp(36px, 9dvh, 7vw);
+}
+.bottom-unit {
+  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  font-size: clamp(13px, 2.6dvh, 22px);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  opacity: 0.65;
+  text-transform: uppercase;
+  transform: translateY(2px);
+}
+/* Direction colours applied uniformly across both cells. */
+.bottom-cell.charging {
+  color: var(--bms-green);
+}
+.bottom-cell.discharging {
+  color: var(--bms-red);
+}
+.bottom-cell.idle {
+  color: var(--bms-cyan);
+}
+/* Phone-portrait: tighten the twin row so it fits without overflowing.
        Drop the day suffix (label still says "until empty / until full" so
        direction is clear) and shrink digit/font sizes a notch. */
-    @media (max-aspect-ratio: 5/4) {
-      .bottom-cell.prediction #pred-day { display: none; }
-      .bottom-value .seg     { font-size: clamp(22px, 6dvh, 8vw); }
-      .bottom-unit           { font-size: clamp(10px, 1.8dvh, 16px); }
-      .bottom-label          { font-size: clamp(9px, 1.2dvh, 12px); }
-    }
-    /* Hide flow icon at idle — the horizontal stroke visually reads as "-". */
-    .bottom-cell.power.idle .flow-icon { visibility: hidden; }
-    /* Power-cell flow icon sits inline with the digits. */
-    .bottom-cell.power .flow-icon { width: clamp(20px, 3.2dvh, 28px); height: clamp(20px, 3.2dvh, 28px); }
+@media (max-aspect-ratio: 5/4) {
+  .bottom-cell.prediction #pred-day {
+    display: none;
+  }
+  .bottom-value .seg {
+    font-size: clamp(22px, 6dvh, 8vw);
+  }
+  .bottom-unit {
+    font-size: clamp(10px, 1.8dvh, 16px);
+  }
+  .bottom-label {
+    font-size: clamp(9px, 1.2dvh, 12px);
+  }
+}
+/* Hide flow icon at idle — the horizontal stroke visually reads as "-". */
+.bottom-cell.power.idle .flow-icon {
+  visibility: hidden;
+}
+/* Power-cell flow icon sits inline with the digits. */
+.bottom-cell.power .flow-icon {
+  width: clamp(20px, 3.2dvh, 28px);
+  height: clamp(20px, 3.2dvh, 28px);
+}
 
-    /* Bottom-right toggles. `advanced ›` opens the diagnostic view;
+/* Bottom-right toggles. `advanced ›` opens the diagnostic view;
        `alarm` opens the battery-room alarm dashboard. Same dim
        uppercase-monospace as the POWER / UNTIL EMPTY captions. */
-    .toggle-adv, .toggle-alarm {
-      position: fixed;
-      bottom: max(10px, env(safe-area-inset-bottom));
-      font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
-      font-size: clamp(10px, 1.4dvh, 13px);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.35);
-      text-decoration: none;
-      padding: 4px 6px;
-      z-index: 9;
-    }
-    .toggle-adv   { right: max(14px, env(safe-area-inset-right)); }
-    .toggle-alarm { right: calc(max(14px, env(safe-area-inset-right)) + 110px); }
-    .toggle-adv:hover, .toggle-adv:focus-visible,
-    .toggle-alarm:hover, .toggle-alarm:focus-visible {
-      color: rgba(255, 255, 255, 0.75);
-      outline: none;
-    }
+.toggle-adv,
+.toggle-alarm {
+  position: fixed;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  font-size: clamp(10px, 1.4dvh, 13px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  text-decoration: none;
+  padding: 4px 6px;
+  z-index: 9;
+}
+.toggle-adv {
+  right: max(14px, env(safe-area-inset-right));
+}
+.toggle-alarm {
+  right: calc(max(14px, env(safe-area-inset-right)) + 110px);
+}
+.toggle-adv:hover,
+.toggle-adv:focus-visible,
+.toggle-alarm:hover,
+.toggle-alarm:focus-visible {
+  color: rgba(255, 255, 255, 0.75);
+  outline: none;
+}
