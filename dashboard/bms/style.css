@@ -139,27 +139,27 @@
     }
     /* Topbar sizing — modest in portrait (cells share a narrow row in flex
        flow), generous in landscape (absolute overlay with empty corners). */
-    .top-cell { display: flex; align-items: center; gap: 10px; }
+    .top-cell { display: flex; align-items: center; gap: 14px; }
     .top-num {
-      font-size: clamp(20px, 5.5dvh, 6vw); line-height: 1;
+      font-size: clamp(28px, 7.5dvh, 8.4vw); line-height: 1;
       color: var(--bms-cyan); text-shadow: 0 0 10px var(--bms-cyan-glow);
     }
     .top-num.warn  { color: var(--bms-red);   text-shadow: 0 0 10px var(--bms-red-glow); }
     .top-num.alert { color: var(--bms-amber); text-shadow: 0 0 10px var(--bms-amber-glow); }
     .top-unit {
       color: var(--bms-cyan);
-      font-size: clamp(11px, 2.6dvh, 2.6vw); font-weight: 600; letter-spacing: 0.06em;
+      font-size: clamp(15px, 3.4dvh, 3.6vw); font-weight: 600; letter-spacing: 0.06em;
       line-height: 1;
-      transform: translateY(1px);
+      transform: translateY(2px);
     }
     .top-num.warn  + .top-unit { color: var(--bms-red); }
     .top-num.alert + .top-unit { color: var(--bms-amber); }
-    .icon { width: clamp(18px, 4.4dvh, 4.4vw); height: clamp(18px, 4.4dvh, 4.4vw); flex: 0 0 auto; }
+    .icon { width: clamp(24px, 5.6dvh, 5.6vw); height: clamp(24px, 5.6dvh, 5.6vw); flex: 0 0 auto; }
     @media (min-aspect-ratio: 5/4) {
-      .top-cell { gap: 14px; }
-      .top-num  { font-size: clamp(28px, 8dvh, 8vw); }
-      .top-unit { font-size: clamp(14px, 3.4dvh, 3.4vw); transform: translateY(2px); }
-      .icon     { width: clamp(24px, 6dvh, 6vw); height: clamp(24px, 6dvh, 6vw); }
+      .top-cell { gap: 18px; }
+      .top-num  { font-size: clamp(36px, 10dvh, 9vw); }
+      .top-unit { font-size: clamp(18px, 4.2dvh, 4vw); transform: translateY(3px); }
+      .icon     { width: clamp(30px, 7dvh, 7vw); height: clamp(30px, 7dvh, 7vw); }
     }
 
     /* Gauge slot — by default takes width-driven natural size (good for
