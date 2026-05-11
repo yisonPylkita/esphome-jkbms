@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Historia" />
+    <meta name="theme-color" content="#000000" />
+    <title data-i18n="history.docTitle">Historia alarmu</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="apple-touch-icon" href="../favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div class="title" data-i18n="history.appTitle">Historia</div>
+        <div class="range-tabs" id="range-tabs" role="tablist">
+          <button class="range-tab on" data-range="day" data-i18n="history.range.day" type="button">dzisiaj</button>
+          <button class="range-tab" data-range="week" data-i18n="history.range.week" type="button">7 dni</button>
+          <button class="range-tab" data-range="month" data-i18n="history.range.month" type="button">30 dni</button>
+        </div>
+      </header>
+
+      <section class="card stats" id="stats-card">
+        <h2 class="card-title" data-i18n="history.section.stats">podsumowanie</h2>
+        <div class="stat-grid">
+          <div class="stat">
+            <div class="stat-lbl" data-i18n="history.stat.armedTime">czas uzbrojenia</div>
+            <div class="stat-val" id="stat-armed">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-lbl" data-i18n="history.stat.doorOpenTime">drzwi otwarte</div>
+            <div class="stat-val" id="stat-door-open">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-lbl" data-i18n="history.stat.triggerCount">wyzwolenia alarmu</div>
+            <div class="stat-val" id="stat-triggers">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-lbl" data-i18n="history.stat.disarmCount">rozbrojenia</div>
+            <div class="stat-val" id="stat-disarms">—</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="door-card">
+        <h2 class="card-title" data-i18n="history.section.door">historia drzwi</h2>
+        <svg
+          id="door-gantt"
+          class="gantt"
+          viewBox="0 0 1000 80"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="Door open / closed history"
+        ></svg>
+        <div class="gantt-legend">
+          <span class="legend-item"
+            ><i class="legend-swatch night"></i><span data-i18n="history.door.night">noc</span></span
+          >
+          <span class="legend-item"
+            ><i class="legend-swatch closed"></i><span data-i18n="history.door.closed">zamknięte</span></span
+          >
+          <span class="legend-item"
+            ><i class="legend-swatch open"></i><span data-i18n="history.door.open">otwarte</span></span
+          >
+        </div>
+        <div class="gantt-axis" id="door-axis"></div>
+      </section>
+
+      <section class="card" id="triggers-card">
+        <h2 class="card-title" data-i18n="history.section.triggers">alarmy</h2>
+        <div id="trigger-list" class="trigger-list"></div>
+      </section>
+
+      <section class="card" id="events-card">
+        <h2 class="card-title" data-i18n="history.section.events">uzbrojenia i rozbrojenia</h2>
+        <ul id="event-list" class="event-list"></ul>
+      </section>
+    </main>
+
+    <a
+      class="toggle-back"
+      href="alarm.html"
+      data-i18n="history.toggle.alarm.text"
+      data-i18n-title="history.toggle.alarm.title"
+      data-i18n-aria="history.toggle.alarm.title"
+      title="Wróć do panelu alarmu"
+      aria-label="Wróć do panelu alarmu"
+      >‹ alarm</a
+    >
+
+    <div class="build-stamp" id="build-stamp">__BUILD_STAMP__</div>
+
+    <script src="../lib/i18n.js"></script>
+    <script src="../lib/sun.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

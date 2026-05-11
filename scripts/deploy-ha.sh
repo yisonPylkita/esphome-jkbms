@@ -104,7 +104,7 @@ declare -a BUILT_PAIRS=()
 #   dashboard/advanced/index.html  → /config/www/bms-dashboard.html
 # Each folder owns its own style.css and app.js; the minifier inlines them
 # (along with lib/*.js shared helpers) into the single deployed HTML.
-for entry in "bms:bms-integrated.html" "advanced:bms-dashboard.html" "alarm:alarm.html"; do
+for entry in "bms:bms-integrated.html" "advanced:bms-dashboard.html" "alarm:alarm.html" "history:alarm-history.html"; do
   folder="${entry%%:*}"
   outname="${entry##*:}"
   src="$DASHBOARD_DIR/$folder/index.html"

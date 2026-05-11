@@ -80,7 +80,7 @@ ok "html.parser on $(printf '%s\n' "$HTML_FILES" | /usr/bin/wc -l | /usr/bin/tr 
 #    dashboard sources must actually exist in dashboard/fonts/, otherwise
 #    the deploy will 404.
 MISSING=""
-for ref in $(/usr/bin/grep -rhoE '/local/fonts/[A-Za-z0-9._-]+' dashboard/{bms,alarm,advanced} 2>/dev/null | /usr/bin/sort -u); do
+for ref in $(/usr/bin/grep -rhoE '/local/fonts/[A-Za-z0-9._-]+' dashboard/{bms,alarm,advanced,history} 2>/dev/null | /usr/bin/sort -u); do
   base="${ref##/local/fonts/}"
   if [ ! -f "dashboard/fonts/$base" ]; then
     MISSING="$MISSING $base"
@@ -93,7 +93,7 @@ ok "font references resolve under dashboard/fonts/"
 #    index.html now climb one level (`../lib/X.js`) since each lives in
 #    its own folder. Validate every match.
 MISSING_LIB=""
-for ref in $(/usr/bin/grep -rhoE 'src="\.\./lib/[A-Za-z0-9._/-]+\.js"' dashboard/{bms,alarm,advanced} 2>/dev/null | /usr/bin/sed -E 's|^src="\.\./lib/||; s/"$//' | /usr/bin/sort -u); do
+for ref in $(/usr/bin/grep -rhoE 'src="\.\./lib/[A-Za-z0-9._/-]+\.js"' dashboard/{bms,alarm,advanced,history} 2>/dev/null | /usr/bin/sed -E 's|^src="\.\./lib/||; s/"$//' | /usr/bin/sort -u); do
   if [ ! -f "dashboard/lib/$ref" ]; then
     MISSING_LIB="$MISSING_LIB $ref"
   fi
@@ -107,7 +107,7 @@ ok "<script src=\"../lib/...\"> references resolve"
 #     to /alarm.html (404). Caught one of these in the wild — guard it.
 # grep returns 1 on no match — under `set -e` that aborts the script; the
 # `|| true` keeps us in the "no offending hrefs found" success path.
-BAD_NAV=$(/usr/bin/grep -rhoE 'href="\.\./[A-Za-z0-9._-]+\.html"' dashboard/{bms,alarm,advanced} 2>/dev/null | /usr/bin/sort -u || true)
+BAD_NAV=$(/usr/bin/grep -rhoE 'href="\.\./[A-Za-z0-9._-]+\.html"' dashboard/{bms,alarm,advanced,history} 2>/dev/null | /usr/bin/sort -u || true)
 if [ -n "$BAD_NAV" ]; then
   printf '\033[31m✗\033[0m cross-dashboard hrefs use ../ prefix; deploy lands files flat — drop the ../:\n%s\n' "$BAD_NAV" >&2
   exit 1
@@ -120,7 +120,7 @@ ok "cross-dashboard <a href> uses sibling-relative paths"
 #    "stylesheet">` tags (i.e. inlining worked end-to-end).
 TMP="$(/usr/bin/mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-for folder in bms alarm advanced; do
+for folder in bms alarm advanced history; do
   src="dashboard/$folder/index.html"
   out="$TMP/$folder.html"
   /usr/bin/sed 's|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|test-token|' "$src" \

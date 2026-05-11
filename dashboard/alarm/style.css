@@ -262,11 +262,12 @@ details.advanced .knob input[type='number'] {
   font-variant-numeric: tabular-nums;
 }
 
-/* Toggle to main view */
-.toggle-main {
+/* Bottom corner toggles — back to main on the LEFT, forward to history
+   on the RIGHT, symmetric to the BMS dashboard's alarm/diag pair. */
+.toggle-main,
+.toggle-history {
   position: fixed;
   bottom: max(10px, env(safe-area-inset-bottom));
-  left: max(14px, env(safe-area-inset-left));
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -275,8 +276,16 @@ details.advanced .knob input[type='number'] {
   padding: 4px 6px;
   z-index: 20;
 }
+.toggle-main {
+  left: calc(14px + env(safe-area-inset-left, 0px));
+}
+.toggle-history {
+  right: calc(14px + env(safe-area-inset-right, 0px));
+}
 .toggle-main:hover,
-.toggle-main:focus-visible {
+.toggle-main:focus-visible,
+.toggle-history:hover,
+.toggle-history:focus-visible {
   color: rgba(255, 255, 255, 0.75);
   outline: none;
 }

@@ -33,7 +33,7 @@ ci: fmt-check check test
 # Render minified copies of all three dashboards into /tmp for inspection.
 minify:
     @mkdir -p /tmp/jkbms-minify
-    @for folder in bms alarm advanced; do \
+    @for folder in bms alarm advanced history; do \
         src="dashboard/$$folder/index.html"; \
         out="/tmp/jkbms-minify/$$folder.html"; \
         sed 's|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|test-token|' "$$src" \
