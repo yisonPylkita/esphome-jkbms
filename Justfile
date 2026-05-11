@@ -37,7 +37,7 @@ minify:
         src="dashboard/$$folder/index.html"; \
         out="/tmp/jkbms-minify/$$folder.html"; \
         sed 's|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|test-token|' "$$src" \
-          | python3 scripts/minify-html.py --source-dir "dashboard/$$folder" > "$$out"; \
+          | .venv/bin/python scripts/minify-html.py --source-dir "dashboard/$$folder" > "$$out"; \
         printf '  %-30s -> %s (%d bytes)\n' "$$src" "$$out" "$$(wc -c < $$out)"; \
     done
 

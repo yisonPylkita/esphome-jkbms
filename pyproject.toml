@@ -1,0 +1,46 @@
+# Dev-only Python project: the firmware lives in `jk-pb-bms.yaml` (ESPHome
+# compiles it). This file exists to drive `uv` so tooling (esphome,
+# ruff, ty) lands in a reproducible `.venv/` keyed off `uv.lock`.
+
+[project]
+name = "esphome-jkbms"
+version = "0"
+description = "JK PB BMS bridge + dashboards — dev tooling only"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  # Firmware config validation (`esphome config`).
+  "esphome>=2026.4",
+  # Python formatter + linter, single Rust binary.
+  "ruff>=0.15",
+  # Astral's type checker — in pre-1.0 development as of 2026-05.
+  "ty>=0.0.35",
+]
+
+[tool.ty.src]
+# `scripts/` holds the only checked-in Python source. Everything else
+# under .esphome/, .venv/, inverter/.esphome/ is build/runtime cache.
+include = ["scripts"]
+exclude = [".esphome", "inverter/.esphome", ".venv", ".tools"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "F",    # pyflakes
+  "I",    # import sorting
+  "UP",   # pyupgrade — flag pre-3.14 idioms
+  "B",    # bugbear
+  "SIM",  # simplifications
+]

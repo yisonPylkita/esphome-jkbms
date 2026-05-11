@@ -42,16 +42,14 @@ require() {
 }
 require git
 require just
-require python3
 require curl
 require tar
 
-# `python3 -m venv` needs the venv module. On most distros it's in the base
-# python package; on a few minimal images (Debian-slim, some Arch installs
-# without `python-pip`) it's absent and you get a confusing import error.
-# Surface a clear hint up front instead.
-if ! python3 -c "import venv" >/dev/null 2>&1; then
-  die "python3 'venv' module is missing — install it (Debian/Ubuntu: apt install python3-venv · Arch: pacman -S python · Fedora: dnf install python3) and re-run"
+# uv (Astral's Python package + version manager) replaces pip + venv. It
+# downloads Python itself if the requested version isn't on the host, so
+# we don't need a system python3 here. Install hint if missing:
+if ! command -v uv >/dev/null 2>&1; then
+  die "uv is missing — install with \`curl -LsSf https://astral.sh/uv/install.sh | sh\` (or your package manager) and re-run"
 fi
 
 # ---------- 1. Detect OS / arch ----------
@@ -67,20 +65,16 @@ case "$(uname -m)" in
 esac
 info "host: $OS-$ARCH"
 
-# ---------- 2. Python venv + esphome ----------
+# ---------- 2. Python via uv: download Python 3.14 if needed, sync deps ----------
 if [ "$INSTALL_ESPHOME" = "1" ]; then
-  if [ ! -d .venv ]; then
-    info "creating Python venv at .venv/"
-    python3 -m venv .venv
-  fi
-  info "upgrading pip + installing dev deps from requirements-dev.txt (this can take a minute)"
-  .venv/bin/pip install --quiet --upgrade pip
-  # esphome → firmware config validation; ruff → Python formatter/linter
-  # used by `just fmt` and `just check`. Pinned in requirements-dev.txt
-  # so this is reproducible and matches what CI uses.
-  .venv/bin/pip install --quiet --upgrade -r requirements-dev.txt
+  info "uv $(uv --version 2>&1 | head -n1 | awk '{print $2}') — syncing Python + dev deps from uv.lock"
+  # `uv sync` reads pyproject.toml + .python-version, downloads the right
+  # Python if not present, materialises .venv/, installs every dep group.
+  uv sync --all-groups --quiet
+  ok ".venv/bin/python ready ($(.venv/bin/python --version 2>&1))"
   ok ".venv/bin/esphome ready ($(.venv/bin/esphome version 2>&1 | head -n1))"
   ok ".venv/bin/ruff ready ($(.venv/bin/ruff --version 2>&1 | head -n1))"
+  ok ".venv/bin/ty ready ($(.venv/bin/ty --version 2>&1))"
 else
   info "skipping Python/esphome setup (--no-esphome)"
 fi

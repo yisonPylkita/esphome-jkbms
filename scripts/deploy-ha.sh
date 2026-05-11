@@ -118,7 +118,7 @@ for entry in "bms:bms-integrated.html" "advanced:bms-dashboard.html" "alarm:alar
   # substitute the token + build-stamp placeholders. The token placeholder
   # lives in app.js (not index.html) since the split, so substitution must
   # happen against the inlined output, not the bare source HTML.
-  /usr/bin/python3 "$MINIFY" --source-dir "$DASHBOARD_DIR/$folder" < "$src" \
+  .venv/bin/python "$MINIFY" --source-dir "$DASHBOARD_DIR/$folder" < "$src" \
     | /usr/bin/sed -e "s|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|$HA_TOKEN|" \
                    -e "s|__BUILD_STAMP__|${STAMP}|" > "$WORK/$outname"
   after=$(/usr/bin/wc -c < "$WORK/$outname")

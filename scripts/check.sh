@@ -30,9 +30,17 @@ for f in scripts/*.sh; do
 done
 ok "bash -n on $(/bin/ls -1 scripts/*.sh | /usr/bin/wc -l | /usr/bin/tr -d ' ') script(s)"
 
-# 2. Python syntax + minifier sanity.
-/usr/bin/python3 -m py_compile scripts/*.py || fail "python syntax"
-ok "python3 -m py_compile on scripts/*.py"
+# 2. Python: static type check (ty) + syntax check fallback.
+#    ty subsumes py_compile (it parses the same AST + much more), so we run
+#    it as gate 0 for Python and only fall back to py_compile when the
+#    toolchain isn't on the box (e.g. minimal CI runners without uv).
+if [ -x ".venv/bin/ty" ]; then
+  .venv/bin/ty check >/dev/null 2>&1 || { .venv/bin/ty check 2>&1 >&2; fail "ty type check"; }
+  ok "ty static type check on scripts/"
+else
+  /usr/bin/python3 -m py_compile scripts/*.py || fail "python syntax"
+  printf '\033[33m·\033[0m ty absent; falling back to python3 -m py_compile\n'
+fi
 
 # 3. JSON validates — every flow / addon snapshot we ship.
 JSON_FILES=$(find homeassistant/node-red homeassistant/addons -name '*.json' -type f 2>/dev/null)
@@ -116,7 +124,7 @@ for folder in bms alarm advanced; do
   src="dashboard/$folder/index.html"
   out="$TMP/$folder.html"
   /usr/bin/sed 's|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|test-token|' "$src" \
-    | /usr/bin/python3 scripts/minify-html.py --source-dir "dashboard/$folder" > "$out" \
+    | .venv/bin/python scripts/minify-html.py --source-dir "dashboard/$folder" > "$out" \
     || fail "minify: $src"
   /usr/bin/python3 - "$out" <<'PY' || fail "minified html parse: $1"
 import html.parser, sys
