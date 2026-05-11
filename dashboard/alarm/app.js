@@ -48,10 +48,18 @@ $('btn-arm').onclick = () =>
   callService('input_select', 'select_option', { entity_id: E.state, option: 'arming' });
 $('btn-disarm').onclick = () =>
   callService('input_select', 'select_option', { entity_id: E.state, option: 'disarmed' });
-$('switch-autoarm').onclick = (e) => {
-  const isOn = e.currentTarget.classList.contains('on');
+function toggleAutoArm() {
+  const el = $('switch-autoarm');
+  const isOn = el.classList.contains('on');
   callService('input_boolean', isOn ? 'turn_off' : 'turn_on', { entity_id: E.autoArm });
-};
+}
+$('switch-autoarm').addEventListener('click', toggleAutoArm);
+$('switch-autoarm').addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    toggleAutoArm();
+  }
+});
 
 // Bind advanced inputs — write on change.
 function bindNumber(inputId, entity) {
@@ -151,7 +159,9 @@ async function tick() {
     $('btn-disarm').disabled = stateVal === 'disarmed';
 
     // Auto-arm switch
-    $('switch-autoarm').classList.toggle('on', autoArm.state === 'on');
+    const autoOn = autoArm.state === 'on';
+    $('switch-autoarm').classList.toggle('on', autoOn);
+    $('switch-autoarm').setAttribute('aria-checked', String(autoOn));
 
     // Sensors
     const dOn = door && door.state === 'on';
@@ -191,6 +201,9 @@ async function tick() {
 
 tick();
 setInterval(tick, POLL_MS);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) tick();
+});
 
 document.addEventListener('keydown', (e) => {
   if (e.target.matches?.('input, textarea, select')) return;

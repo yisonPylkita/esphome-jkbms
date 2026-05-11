@@ -244,7 +244,7 @@ function renderDoorGantt(history, from, to) {
   const days = Math.ceil(span / oneDayMs) + 1;
   for (let i = -1; i < days; i++) {
     const dayStart = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
-    const { rise, set } = sunTimesFor(dayStart, SITE.lat, SITE.lon);
+    const { sunrise: rise, sunset: set } = sunTimesFor(dayStart, SITE.lat, SITE.lon);
     // Two night bands per day: midnight-rise, set-midnight(next).
     const bands = [
       { a: new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate()), b: rise },
