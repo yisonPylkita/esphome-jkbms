@@ -86,8 +86,8 @@ DASHBOARD_DIR="$HERE/dashboard"
 # Build metadata — baked into the advanced dashboard's `__BUILD_STAMP__`
 # placeholder so you can confirm at a glance which commit / source-file
 # content is currently deployed. Source hash is computed BEFORE any
-# substitutions, so it matches `sha256sum dashboard/dashboard.html` run
-# locally on a clean working tree.
+# substitutions, so it matches `sha256sum dashboard/{bms,alarm,advanced,
+# history}/index.html` run locally on a clean working tree.
 GIT_BRANCH="$(cd "$HERE" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
 GIT_COMMIT="$(cd "$HERE" && git rev-parse --short=8 HEAD 2>/dev/null || echo unknown)"
 if [ -n "$(cd "$HERE" && git status --porcelain 2>/dev/null)" ]; then

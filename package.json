@@ -2,10 +2,6 @@
   "name": "esphome-jkbms",
   "private": true,
   "description": "JK PB BMS bridge + dashboards — dev tooling only. No runtime deps (browser code is vanilla, served straight from /local/).",
-  "scripts": {
-    "fmt": "prettier --write .",
-    "fmt-check": "prettier --check ."
-  },
   "devDependencies": {
     "prettier": "3.3.3"
   }

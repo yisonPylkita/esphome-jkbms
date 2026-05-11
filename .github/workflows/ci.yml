@@ -5,9 +5,23 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel in-flight runs for the same ref when a newer push lands —
+# common pattern for `ref-scoped` concurrency so PR rebases don't
+# stack up redundant runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Matrix across Linux + macOS — every contributor dev-loops on macOS,
+    # CI lands on Linux. Catching portability bugs in scripts/*.sh (e.g.
+    # GNU vs BSD sed/grep) needs both.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +37,7 @@ jobs:
       # `npm ci` is ~instant on a hit.
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Sync Python deps (esphome + ruff + ty)
@@ -38,25 +52,20 @@ jobs:
       - name: just fmt-check (prettier + ruff)
         run: bash scripts/fmt.sh --check
 
-      # secrets.yaml is gitignored — synthesise a minimal stub so esphome
-      # can resolve `!secret` references during `esphome config`. Values
-      # don't need to be real, just present.
+      # secrets.yaml is gitignored — synthesise a stub from secrets.yaml.example
+      # so the two can't silently drift. `*_encryption_key` placeholders need
+      # a valid base64-32 to pass esphome's `api:` validator; everything else
+      # collapses to "ci-stub". The `AA:BB:CC:DD:EE:FF` MAC in the example
+      # is already a valid sentinel, so we leave it untouched.
       - name: Provide stub secrets.yaml
         run: |
-          cat > secrets.yaml <<'EOF'
-          wifi_ssid: "ci-stub"
-          wifi_password: "ci-stub"
-          api_encryption_key: "1234567890123456789012345678901234567890123="
-          ota_password: "ci-stub"
-          ap_password: "ci-stub"
-          bms_mac_address: "AA:BB:CC:DD:EE:FF"
-          easun_api_encryption_key: "1234567890123456789012345678901234567890123="
-          easun_ota_password: "ci-stub"
-          ha_host: "ci-stub"
-          ha_user: "root"
-          ha_token: "ci-stub"
-          EOF
+          sed -E \
+            -e 's/"REPLACE_WITH_BASE64_32_BYTES"/"1234567890123456789012345678901234567890123="/g' \
+            -e 's/"(REPLACE_WITH_[A-Z_]+|PASTE_[A-Z_]+|your-[a-z-]+|100\.x\.x\.x)"/"ci-stub"/g' \
+            secrets.yaml.example > secrets.yaml
           ln -sf "$(pwd)/secrets.yaml" inverter/secrets.yaml
+          echo "--- stub secrets.yaml ---"
+          cat secrets.yaml
 
       - name: scripts/check.sh
         run: bash scripts/check.sh

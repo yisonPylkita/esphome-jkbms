@@ -2,7 +2,6 @@
 .venv/
 .tools/
 node_modules/
-syssi/
 .git/
 
 # Build outputs we never commit.
