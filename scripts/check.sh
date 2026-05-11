@@ -93,6 +93,19 @@ done
 [ -z "$MISSING_LIB" ] || fail "lib scripts referenced but not in dashboard/lib/:$MISSING_LIB"
 ok "<script src=\"../lib/...\"> references resolve"
 
+# 7b. Cross-dashboard navigation must NOT use `../X.html`. After deploy
+#     every dashboard lands flat in /config/www/, so sibling-relative
+#     `href="alarm.html"` is what works. `../alarm.html` would resolve
+#     to /alarm.html (404). Caught one of these in the wild — guard it.
+# grep returns 1 on no match — under `set -e` that aborts the script; the
+# `|| true` keeps us in the "no offending hrefs found" success path.
+BAD_NAV=$(/usr/bin/grep -rhoE 'href="\.\./[A-Za-z0-9._-]+\.html"' dashboard/{bms,alarm,advanced} 2>/dev/null | /usr/bin/sort -u || true)
+if [ -n "$BAD_NAV" ]; then
+  printf '\033[31m✗\033[0m cross-dashboard hrefs use ../ prefix; deploy lands files flat — drop the ../:\n%s\n' "$BAD_NAV" >&2
+  exit 1
+fi
+ok "cross-dashboard <a href> uses sibling-relative paths"
+
 # 8. Minifier round-trip — substitute a fake token, run the minifier on
 #    each component-folder index.html, confirm the output still parses
 #    as HTML AND contains no unresolved `<script src=` or `<link rel=
