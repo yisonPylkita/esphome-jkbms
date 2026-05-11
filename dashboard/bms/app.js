@@ -28,7 +28,6 @@ const STALE_MS = 15000;
 // ============================================================
 
 const isDemo = new URLSearchParams(location.search).has('demo');
-const $ = (id) => document.getElementById(id);
 
 // ---- Geometry helpers (mirror bms-gauges.jsx, but in viewBox 0..100 × 0..62) ----
 // Gauge canvas is 100 × 62 (the visible band of a 100×100 design canvas
@@ -322,14 +321,12 @@ function updatePrediction(soc, capRemAh, capTotAh, voltV, signedPowerW) {
 }
 
 // ---- HA fetch ----
+// Thin wrapper around haGetState (lib/ha.js) so the demo-mode path stays
+// local to this file. In demo mode we synthesise a state object; otherwise
+// we delegate to the shared lib client.
 async function fetchState(id) {
   if (isDemo) return demoState(id);
-  const r = await fetch(`${HA_URL}/api/states/${id}`, {
-    headers: { Authorization: 'Bearer ' + TOKEN },
-    cache: 'no-store',
-  });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
+  return haGetState(id);
 }
 function demoState(id) {
   const t = Date.now() / 1000;
@@ -437,8 +434,7 @@ try {
 
 buildGauge();
 buildBatteryBar();
-tick();
-setInterval(tick, POLL_MS);
+startPolling(tick, POLL_MS);
 
 // Re-measure %-glyph position once DSEG7 web font is loaded — first paint
 // happens against the monospace fallback (narrower), so getBBox returns a
@@ -449,9 +445,6 @@ if (document.fonts && document.fonts.ready) {
     if (!isNaN(_lastSoc)) updateSocReadout(_lastSoc);
   });
 }
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) tick();
-});
 
 // Keyboard shortcut: A → advanced view.
 document.addEventListener('keydown', (e) => {
