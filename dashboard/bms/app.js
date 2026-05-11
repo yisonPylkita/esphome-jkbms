@@ -237,6 +237,11 @@ function recentAvg(windowMs) {
 //    is immediate.
 const PRED_DOM_REFRESH_MS = 15 * 1000;
 const PRED_TIME_GRAIN_MIN = 5;
+// At ≥ 99 % SOC, any draw below this threshold is treated as the inverter's
+// idle / parasitic baseline (not a real load). Projecting it out to "empty
+// in 24 h" just confuses the reader — better to show "spoczynek" until a
+// real load picks up.
+const PRED_FULL_HOLD_W = 200;
 let _lastPredOut = { ts: 0, dir: '', kind: '', big: '', sub: '', lbl: '' };
 
 function updatePrediction(soc, capRemAh, capTotAh, voltV, signedPowerW) {
@@ -256,6 +261,13 @@ function updatePrediction(soc, capRemAh, capTotAh, voltV, signedPowerW) {
   if (!Number.isFinite(soc) || !Number.isFinite(voltV)) {
     // leave defaults
   } else if (!Number.isFinite(signedPowerW) || Math.abs(signedPowerW) < POWER_DEAD_W) {
+    dir = 'idle';
+    lbl = t('bms.idle');
+  } else if (soc >= 99 && Math.abs(signedPowerW) < PRED_FULL_HOLD_W) {
+    // At ≥ 99 % SOC, a small residual draw (inverter idle, internal
+    // consumption, balancing current) projects ~24 h into the future
+    // and isn't actionable — the pack will just sit at "full" while
+    // that trickle runs. Suppress the prediction; show plain idle.
     dir = 'idle';
     lbl = t('bms.idle');
   } else {
