@@ -149,7 +149,7 @@ The recipe runs `just check && just test` first, then invokes
 
 1. Reads `ha_host` / `ha_user` / `ha_token` from `secrets.yaml` (env vars
    override them — `HA_HOST=… HA_TOKEN=… just deploy`).
-2. Substitutes the token + build stamp + deploy ID into each dashboard,
+2. Substitutes the token + build stamp + deploy id into each dashboard,
    minifies inline CSS / JS (and inlines `dashboard/lib/*.js`), then
    `scp`s them to `/config/www/`.
 3. Mirrors `dashboard/fonts/` to `/config/www/fonts/` (DSEG7 Modern Bold
@@ -158,8 +158,8 @@ The recipe runs `just check && just test` first, then invokes
    `/config/packages/jk_alarm.yaml` (HA's `packages:` mechanism merges
    the helpers per-domain, idempotent across re-runs).
 5. Writes `/config/www/version.json` carrying the build's `deployId`;
-   every running dashboard polls it once a minute and reloads itself
-   on a mismatch (see "Self-update" below).
+   every running dashboard polls it once a minute and transparently
+   hard-reloads itself iff the id has changed (see "Version sync" below).
 6. Runs `ha core check` and reloads `input_boolean` / `input_number` /
    `input_text` domains via the HA REST API.
 
@@ -236,7 +236,7 @@ the HA server config on first start (see Disaster recovery below).
 │   │   ├── sun.js                 Sunrise/sunset (for the history Gantt shading)
 │   │   ├── zones.js               SOC / V / T zone tables
 │   │   ├── alarm-fsm.js           Canonical alarm FSM (mirrored into flows.json)
-│   │   └── auto-update.js         /local/version.json poller → location.reload()
+│   │   └── version-check.js       /local/version.json poller → hard reload on commit drift
 │   ├── favicon.svg            PWA icon — vertical battery, dashboard palette
 │   └── fonts/                 Self-hosted DSEG7 Modern Bold (OFL 1.1)
 ├── homeassistant/
@@ -281,14 +281,18 @@ Tokens never enter the repo. Each `*.html` template carries the literal
 placeholder `PASTE_LONG_LIVED_ACCESS_TOKEN_HERE`; `scripts/deploy-ha.sh`
 substitutes it at deploy time. `.gitignore` blocks `dashboard/*.local.html`.
 
-### Self-update
+### Version sync
 
-Every dashboard polls `/local/version.json` once a minute and
-`location.reload()`s itself when the server's `deployId` differs from the
-one baked at deploy time. Implementation: `dashboard/lib/auto-update.js`
-plus the `__DEPLOY_ID__` placeholder substituted by `scripts/deploy-ha.sh`.
-Effect: within ~60 seconds of `just deploy`, every open dashboard tab
-reflects the new code without a manual refresh.
+Each deploy bakes a `deployId` (the short git commit hash, plus `+dirty`
+on uncommitted trees) into every dashboard and mirrors it into
+`/local/version.json`. Each running dashboard polls that manifest every
+60 s and, on a real mismatch, transparently hard-reloads itself. The id
+is commit-derived (no timestamp), so re-deploying the same commit is a
+no-op for open tabs — only an actual code change triggers a reload.
+After the reload the new page's baked id matches the server's; no
+further reloads until the next deploy. Implementation:
+`dashboard/lib/version-check.js`. There is no banner — the reload is
+silent.
 
 ### i18n
 

@@ -96,11 +96,12 @@ else
   GIT_DIRTY=""
 fi
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%MZ)"
-# Single deploy id stamped into every dashboard's `installAutoUpdate(...)`
-# call. The version.json we push at the end of the deploy carries the
-# same string; each dashboard polls /local/version.json once a minute
-# and `location.reload()`s itself if the id changes.
-DEPLOY_ID="${GIT_COMMIT}${GIT_DIRTY}-$(date -u +%s)"
+# Deploy id baked into every dashboard's `installVersionCheck(...)` call
+# and mirrored into /local/version.json. Deliberately commit-derived
+# (NOT timestamp-suffixed): a no-op re-deploy from the same commit must
+# leave open tabs untouched. Only a real code change → new commit →
+# new id → transparent hard reload on the next poll.
+DEPLOY_ID="${GIT_COMMIT}${GIT_DIRTY}"
 
 declare -a BUILT_PAIRS=()
 # Source layout (component-style folders under dashboard/):
@@ -180,10 +181,10 @@ for pair in "${BUILT_PAIRS[@]}"; do
   $SCP "$local_path" "$HA_USER@$HA_HOST:$remote_path"
 done
 
-# ---- 3a. version.json — the manifest each dashboard polls once a
-#          minute to decide whether to reload itself. Always one short
-#          file, deployId matches the value baked into every dashboard
-#          via the __DEPLOY_ID__ sed substitution above.
+# ---- 3a. version.json — the manifest every dashboard polls. deployId
+#          mirrors the value baked into each dashboard via the
+#          __DEPLOY_ID__ substitution; mismatch triggers a transparent
+#          hard reload in the client. Always one short file.
 cat > "$WORK/version.json" <<EOF
 {"deployId":"${DEPLOY_ID}","deployedAt":"${BUILD_TIME}","branch":"${GIT_BRANCH}","commit":"${GIT_COMMIT}${GIT_DIRTY}"}
 EOF
