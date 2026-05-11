@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: MIT
+//
+// BMS main dashboard — paired with `dashboard/bms/index.html`.
+// Polls 1 Hz against the HA REST API for the JK PB BMS entities,
+// drives the gauge / battery bar / topbar / power + prediction
+// readout. Token is substituted at deploy time. Shared helpers
+// (`t`, `applyI18n`, `predictLinear`, zone tables, etc.) come from
+// `dashboard/lib/*.js`, inlined by `scripts/minify-html.py`.
+
 document.addEventListener('DOMContentLoaded', () => {
   applyI18n();
   const stamp = document.querySelector('.build-stamp');

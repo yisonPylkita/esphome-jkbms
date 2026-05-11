@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: MIT
+//
+// BMS diagnostic dashboard — paired with `dashboard/advanced/index.html`.
+// English-only by deliberate choice. Polls every BMS entity HA knows about
+// (full /api/states), renders per-cell voltages + resistances, multi-range
+// canvas time-series charts (1h / 6h / 24h / 3d / 7d) for SOC / current /
+// power / temperature, raw JSON viewer, polling diagnostics. Heaviest of
+// the four dashboards; consider it the "developer" view.
+
 // ============================================================
 // CONFIG. The TOKEN placeholder is substituted at deploy time by
 // scripts/deploy-ha.sh from the value in secrets.yaml — don't hand-

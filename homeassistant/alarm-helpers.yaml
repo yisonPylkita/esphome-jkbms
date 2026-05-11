@@ -1,8 +1,11 @@
-# Helpers for the battery-room alarm. Driven by node-red/battery-room-alarm.flow.json
-# and rendered by dashboard/alarm.html.
+# Helpers for the battery-room alarm. Driven by homeassistant/node-red/flows.json
+# and rendered by dashboard/alarm/index.html.
 #
-# Append to /config/configuration.yaml on the HA box. scripts/deploy-ha.sh
-# does this idempotently — keyed off a marker comment so re-runs are safe.
+# Deployed by `scripts/deploy-ha.sh` as `/config/packages/jk_alarm.yaml`.
+# HA merges each file in `/config/packages/` per-domain via the
+# `homeassistant.packages: !include_dir_named packages` directive (added
+# idempotently by the deploy script). Re-running the deploy is safe — it
+# overwrites the whole file.
 #
 # Model: `input_select.alarm_state` is the single source of truth for the
 # alarm's state machine. The dashboard's ARM / DISARM buttons just write

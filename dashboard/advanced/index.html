@@ -95,12 +95,8 @@
       >‹ main</a
     >
     <!-- Substituted by scripts/deploy-ha.sh — DO NOT touch by hand. -->
-    <div
-      class="build-stamp"
-      title="Dashboard build identifier (compare against sha256sum dashboard/dashboard.html locally to verify the deploy)"
-    >
-      __BUILD_STAMP__
-    </div>
+    <!-- Title set at runtime by app.js via i18n (buildstamp.title). -->
+    <div class="build-stamp">__BUILD_STAMP__</div>
 
     <!-- Pure functions extracted for testability — inlined into the deployed
        HTML by scripts/minify-html.py at deploy time. -->

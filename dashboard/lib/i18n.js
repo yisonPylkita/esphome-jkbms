@@ -8,6 +8,13 @@
 // Static text in templates: `<span data-i18n="key"></span>` + `applyI18n()`
 // once on DOMContentLoaded. Dynamic text in JS: `t('key')` or
 // `t('key', param0, param1)` (positional `{0}` / `{1}` substitution).
+//
+// To add a third language, extend `T` with a new top-level key (e.g. `de`,
+// `fr`); `_detectLang` already auto-accepts any key present in `T` that
+// matches the first two chars of `<html lang="...">`. Strings missing from
+// a non-default language fall back to PL (the user's father is the primary
+// user). Setting `lang` via the URL is not currently supported —
+// `<html lang="...">` is read once on script-load.
 
 const T = {
   pl: {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 //
-// Alarm-history dashboard. Reads HA's logbook + history REST endpoints
+// Alarm-history dashboard — paired with `dashboard/history/index.html`.
+// Reads HA's `/api/logbook/...` + `/api/history/period/...` REST endpoints
 // for `input_select.alarm_state` and `binary_sensor.battery_room_door_contact`
 // and renders four widgets:
 //   1. stat tiles — armed time, door-open time, trigger / disarm counts
@@ -8,7 +9,11 @@
 //   3. trigger summary cards — one per "triggered" episode
 //   4. event list — every arm / disarm event in the range, with user
 //
-// The token + entity IDs follow the pattern used by the other dashboards.
+// Token + entity IDs follow the same pattern as the other dashboards.
+// USER_MAP (below) hand-maps HA context_user_id UUIDs to friendly labels;
+// new family-member accounts show up as a raw 6-char hex prefix until
+// added here — see the README "Mapping HA user IDs to friendly names"
+// section for how to look up a UUID.
 
 const HA_URL = '';
 const TOKEN = 'PASTE_LONG_LIVED_ACCESS_TOKEN_HERE';

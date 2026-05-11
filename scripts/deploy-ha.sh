@@ -83,7 +83,7 @@ trap 'rm -rf "$WORK"' EXIT
 MINIFY="$HERE/scripts/minify-html.py"
 DASHBOARD_DIR="$HERE/dashboard"
 
-# Build metadata — baked into the advanced dashboard's `__BUILD_STAMP__`
+# Build metadata — baked into each dashboard's `__BUILD_STAMP__`
 # placeholder so you can confirm at a glance which commit / source-file
 # content is currently deployed. Source hash is computed BEFORE any
 # substitutions, so it matches `sha256sum dashboard/{bms,alarm,advanced,
