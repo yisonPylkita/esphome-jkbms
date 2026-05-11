@@ -68,15 +68,21 @@ main {
 }
 .state-name.triggered {
   color: var(--bms-red);
-  animation: pulse 1.2s ease-in-out infinite;
+  animation: alarm-pulse 1.2s ease-in-out infinite;
 }
-@keyframes pulse {
+@keyframes alarm-pulse {
   0%,
   100% {
     opacity: 1;
   }
   50% {
     opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .state-name.triggered {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 .state-detail {
@@ -117,20 +123,22 @@ main {
   background: rgba(255, 255, 255, 0.16);
 }
 .btn.primary {
-  background: rgba(27, 255, 124, 0.08);
-  border-color: rgba(27, 255, 124, 0.4);
-  color: var(--bms-green);
+  --btn-tint: var(--bms-green);
+  background: color-mix(in oklab, var(--btn-tint) 8%, transparent);
+  border-color: color-mix(in oklab, var(--btn-tint) 40%, transparent);
+  color: var(--btn-tint);
 }
 .btn.primary:hover {
-  background: rgba(27, 255, 124, 0.18);
+  background: color-mix(in oklab, var(--btn-tint) 18%, transparent);
 }
 .btn.danger {
-  background: rgba(255, 46, 61, 0.08);
-  border-color: rgba(255, 46, 61, 0.4);
-  color: var(--bms-red);
+  --btn-tint: var(--bms-red);
+  background: color-mix(in oklab, var(--btn-tint) 8%, transparent);
+  border-color: color-mix(in oklab, var(--btn-tint) 40%, transparent);
+  color: var(--btn-tint);
 }
 .btn.danger:hover {
-  background: rgba(255, 46, 61, 0.18);
+  background: color-mix(in oklab, var(--btn-tint) 18%, transparent);
 }
 .btn:disabled {
   opacity: 0.3;
@@ -195,6 +203,10 @@ main {
   position: relative;
   cursor: pointer;
   transition: background 0.15s ease;
+}
+.switch:focus-visible {
+  outline: 2px solid var(--bms-cyan);
+  outline-offset: 2px;
 }
 .switch::after {
   content: '';
