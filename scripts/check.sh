@@ -66,7 +66,9 @@ else
 fi
 if [ -n "$ESPHOME" ]; then
   for f in jk-pb-bms.yaml inverter/easun.yaml; do
-    "$ESPHOME" config "$f" >/dev/null 2>&1 || fail "esphome config: $f"
+    # Single-capture: hold stderr, dump only on failure so CI logs
+    # show the actual validator complaint instead of just "config:".
+    out=$("$ESPHOME" config "$f" 2>&1) || { printf '%s\n' "$out" >&2; fail "esphome config: $f"; }
   done
   ok "esphome config on jk-pb-bms.yaml, inverter/easun.yaml"
 fi

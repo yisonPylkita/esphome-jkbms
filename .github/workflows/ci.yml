@@ -53,15 +53,17 @@ jobs:
         run: bash scripts/fmt.sh --check
 
       # secrets.yaml is gitignored — synthesise a stub from secrets.yaml.example
-      # so the two can't silently drift. `*_encryption_key` placeholders need
-      # a valid base64-32 to pass esphome's `api:` validator; everything else
-      # collapses to "ci-stub". The `AA:BB:CC:DD:EE:FF` MAC in the example
-      # is already a valid sentinel, so we leave it untouched.
+      # so the two can't silently drift. Two constraints from esphome's
+      # config validator: `*_encryption_key` must be valid base64-32, and
+      # WPA `wifi_password` / `ap_password` must be ≥ 8 chars (the catch-all
+      # below uses 12 so both are satisfied without per-field rules).
+      # The `AA:BB:CC:DD:EE:FF` MAC in the example is already a valid
+      # sentinel and is left untouched.
       - name: Provide stub secrets.yaml
         run: |
           sed -E \
             -e 's/"REPLACE_WITH_BASE64_32_BYTES"/"1234567890123456789012345678901234567890123="/g' \
-            -e 's/"(REPLACE_WITH_[A-Z_]+|PASTE_[A-Z_]+|your-[a-z-]+|100\.x\.x\.x)"/"ci-stub"/g' \
+            -e 's/"(REPLACE_WITH_[A-Z_]+|PASTE_[A-Z_]+|your-[a-z-]+|100\.x\.x\.x)"/"ci-stub-1234"/g' \
             secrets.yaml.example > secrets.yaml
           ln -sf "$(pwd)/secrets.yaml" inverter/secrets.yaml
           echo "--- stub secrets.yaml ---"
