@@ -94,6 +94,8 @@ const T = {
     'alarm.cause.door': 'otwarcie drzwi',
     'alarm.cause.motion_main': 'ruch (główny)',
     'alarm.cause.motion_aux': 'ruch (pomocniczy)',
+    'alarm.cause.tamper': 'manipulacja czujnikiem',
+    'alarm.sensor.unavailable': 'czujnik niedostępny',
     'alarm.history.link': 'historia ›',
     'alarm.history.linkTitle': 'Historia uzbrojeń i alarmów',
 
@@ -197,6 +199,8 @@ const T = {
     'alarm.cause.door': 'door opened',
     'alarm.cause.motion_main': 'motion (main)',
     'alarm.cause.motion_aux': 'motion (aux)',
+    'alarm.cause.tamper': 'sensor tampered with',
+    'alarm.sensor.unavailable': 'sensor unavailable',
     'alarm.history.link': 'history ›',
     'alarm.history.linkTitle': 'Arm / disarm / trigger history',
 

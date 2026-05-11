@@ -12,7 +12,8 @@
 //              both motion sensors must read no-motion for
 //              `armingQuietMinutes`. Any sensor activity resets the timer.
 //   armed      the alarm is live. After a brief grace period, any sensor
-//              trip moves to `triggered`.
+//              trip moves to `triggered`. Tamper bypasses the grace
+//              period — tampering with a sensor is a fast-path threat.
 //   triggered  alarm condition met. Siren rings for `sirenDurationS` then
 //              quiets, but state stays `triggered` until manually reset
 //              (UI writes 'disarmed' to the input_select).
@@ -24,6 +25,10 @@
 //   ctx.doorOpen             boolean
 //   ctx.motionMain           boolean
 //   ctx.motionAux            boolean
+//   ctx.tamper               boolean — OR of every available tamper sensor
+//   ctx.sensorsAvailable     boolean — false if ANY required sensor reads
+//                            'unavailable' or 'unknown'; gates auto-arm so
+//                            the system never arms with a blind sensor
 //   ctx.autoArmEnabled       boolean — input_boolean.alarm_auto_arm_enabled
 //   ctx.armingQuietMinutes   number  — minutes of quiet before auto-arm
 //   ctx.armingGraceSeconds   number  — leeway after armed before any motion trips
@@ -44,6 +49,10 @@
 function stepAlarm(ctx) {
   const motion = !!(ctx.motionMain || ctx.motionAux);
   const door = !!ctx.doorOpen;
+  const tamper = !!ctx.tamper;
+  // Default true when the caller hasn't wired the availability check —
+  // keeps the FSM backward-compatible with older flow snapshots.
+  const sensorsAvailable = ctx.sensorsAvailable !== false;
 
   let state = ctx.state || 'disarmed';
   let stateSince = ctx.stateSince || ctx.now;
@@ -58,13 +67,22 @@ function stepAlarm(ctx) {
   switch (state) {
     case 'disarmed': {
       // Auto-arm: once auto-arm is enabled and the room is quiet
-      // (door closed + no motion) for one tick, start the arming
-      // countdown. Manual arm (UI button) sets state directly so doesn't
-      // need a branch here.
-      if (ctx.autoArmEnabled && !door && !motion) set('arming');
+      // (door closed + no motion + no tamper) AND every sensor reports
+      // a real value, start the arming countdown. Manual arm (UI
+      // button) sets state directly so doesn't need a branch here.
+      if (ctx.autoArmEnabled && !door && !motion && !tamper && sensorsAvailable) {
+        set('arming');
+      }
       break;
     }
     case 'arming': {
+      // Tamper during arming → straight to triggered. Someone is
+      // messing with a sensor before the system fully arms; treat as
+      // hostile.
+      if (tamper) {
+        set('triggered', 'tamper');
+        break;
+      }
       if (door || motion) {
         // Reset the timer — the room isn't actually quiet yet.
         stateSince = ctx.now;
@@ -76,8 +94,13 @@ function stepAlarm(ctx) {
       break;
     }
     case 'armed': {
-      // Brief grace after the transition to 'armed' so a final sensor
-      // ping from someone walking out doesn't immediately self-trigger.
+      // Tamper bypasses the grace period. Door + motion respect grace
+      // (someone walking out shouldn't self-trigger). Tampering is
+      // always intentional.
+      if (tamper) {
+        set('triggered', 'tamper');
+        break;
+      }
       const sinceArmedMs = ctx.now - stateSince;
       const graceMs = (ctx.armingGraceSeconds || 10) * 1000;
       if (sinceArmedMs < graceMs) break;

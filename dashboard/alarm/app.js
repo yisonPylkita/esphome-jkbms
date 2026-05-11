@@ -26,6 +26,7 @@ const E = {
   graceSec: 'input_number.alarm_arming_grace_seconds',
   sirenSec: 'input_number.alarm_siren_duration_s',
   reason: 'input_text.alarm_trigger_reason',
+  sensorStatus: 'input_text.alarm_sensor_status',
   door: 'binary_sensor.battery_room_door_contact',
   motionMain: 'binary_sensor.battery_room_motion_main_occupancy',
   motionAux: 'binary_sensor.battery_room_motion_aux_occupancy',
@@ -92,21 +93,28 @@ for (const id of ['cfg-quiet-min', 'cfg-grace-sec', 'cfg-siren-sec']) {
 
 async function tick() {
   try {
-    const [st, autoArm, quiet, grace, siren, reason, door, mMain, mAux, sirenE] = await Promise.all(
-      [
+    const [st, autoArm, quiet, grace, siren, reason, sensorStatus, door, mMain, mAux, sirenE] =
+      await Promise.all([
         haGetState(E.state),
         haGetState(E.autoArm),
         haGetState(E.quietMin),
         haGetState(E.graceSec),
         haGetState(E.sirenSec),
         haGetState(E.reason).catch(() => null),
+        haGetState(E.sensorStatus).catch(() => null),
         haGetState(E.door).catch(() => null),
         haGetState(E.motionMain).catch(() => null),
         haGetState(E.motionAux).catch(() => null),
         haGetState(E.siren).catch(() => null),
-      ],
-    );
+      ]);
     $('stale').classList.remove('visible');
+
+    // Sensor-degraded banner — set by Node-RED when any required sensor
+    // is unavailable. Empty string = healthy.
+    const sensorStatusText = sensorStatus?.state || '';
+    const banner = $('sensor-status');
+    if (banner) banner.textContent = sensorStatusText;
+    if (banner) banner.classList.toggle('visible', !!sensorStatusText);
 
     // Hero — internal state names (disarmed/arming/armed/triggered) stay
     // English in HA so the FSM and other consumers don't have to deal

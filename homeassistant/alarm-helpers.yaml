@@ -62,3 +62,51 @@ input_text:
     icon: mdi:information
     initial: ""
     max: 64
+  # Set by the Node-RED FSM wrapper when any required sensor reads
+  # `unavailable` / `unknown`. Dashboard reads this to surface a
+  # warning ("uwaga: czujnik X niedostępny") so the user knows the
+  # system is degraded.
+  alarm_sensor_status:
+    name: Alarm sensor status
+    icon: mdi:alert
+    initial: ""
+    max: 128
+
+# Notification group — single point of edit when adding / removing a
+# family member's phone. Both the alarm trigger (Node-RED) and the
+# low-battery automation below call `notify.alarm_recipients`.
+notify:
+  - platform: group
+    name: alarm_recipients
+    services:
+      - service: mobile_app_wojciechs_iphone
+      - service: mobile_app_iphone_grzegorz
+
+# Low-battery alert — push to the group when any door / motion sensor
+# reports `battery_low: on` (Zigbee2MQTT exposes a binary_sensor per
+# device). The `for: "5m"` debounces brief radio glitches that flip
+# the attribute momentarily.
+automation:
+  - alias: alarm_sensor_battery_low
+    description: Notify family when an alarm sensor's battery is low.
+    mode: single
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.battery_room_door_battery_low
+          - binary_sensor.battery_room_motion_aux_battery_low
+        to: "on"
+        for: "00:05:00"
+    action:
+      - service: notify.alarm_recipients
+        data:
+          title: "🔋 Czujnik alarmu — niski poziom baterii"
+          message: >-
+            {{ trigger.to_state.attributes.friendly_name or trigger.entity_id }}
+            zgłasza niski poziom baterii. Wymień ogniwo, zanim alarm zostanie
+            zdegradowany.
+          data:
+            channel: alarm
+            importance: high
+            push:
+              interruption-level: time-sensitive

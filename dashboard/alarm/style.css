@@ -33,6 +33,25 @@ main {
     max(96px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-right));
 }
 
+/* Sensor-degraded banner — shows under the connection-stale overlay
+   when Node-RED flags any required sensor as unavailable. Same amber
+   "we noticed but life goes on" register as a warning toast. */
+.sensor-status {
+  display: none;
+  margin: max(20px, env(safe-area-inset-top)) auto 0;
+  max-width: 600px;
+  padding: 10px 14px;
+  background: color-mix(in oklab, var(--bms-amber) 12%, transparent);
+  border: 1px solid var(--bms-amber);
+  border-radius: 6px;
+  color: var(--bms-amber);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.sensor-status.visible {
+  display: block;
+}
+
 /* Big state hero */
 .state-hero {
   text-align: center;

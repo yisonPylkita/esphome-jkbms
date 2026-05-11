@@ -303,15 +303,43 @@ is deliberately English-only.
 
 ### Adding a push-notification target
 
-The Node-RED flow fans the trigger event out to two iPhones via two
-parallel `api-call-service` nodes calling
-`notify.mobile_app_wojciechs_iphone` and `notify.mobile_app_iphone_grzegorz`
-(node IDs `call_notify` and `call_notify_dad`). To add a third device:
-edit `homeassistant/node-red/flows.json`, duplicate the `call_notify_dad`
-node, point its `service` / `action` at the new `notify.mobile_app_*`
-target, then wire it into the FSM trigger fanout (same output as the
-existing two). Apply with `just restore --configs-only` (or import the
-flow manually in Node-RED).
+Both the alarm trigger (Node-RED) and the low-battery automation
+(HA-side) call `notify.alarm_recipients`, a notification **group**
+defined in `homeassistant/alarm-helpers.yaml`. To add a third family
+member's phone, edit the group's `services:` list:
+
+```yaml
+notify:
+  - platform: group
+    name: alarm_recipients
+    services:
+      - service: mobile_app_wojciechs_iphone
+      - service: mobile_app_iphone_grzegorz
+      - service: mobile_app_NEW_DEVICE # ← add here
+```
+
+Then `just deploy` (pushes the updated helpers) and restart HA core
+(notify groups are registered at startup; `homeassistant.reload_core_config`
+is enough). One place to edit; no Node-RED flow surgery needed.
+
+### Sensor health: tamper, unavailable, low battery
+
+The FSM treats sensor problems as part of the alarm posture:
+
+- **Tamper.** Z2M exposes `binary_sensor.battery_room_door_tamper` and
+  `battery_room_motion_aux_tamper`. The FSM watches both; any
+  positive reading while in `arming` or `armed` triggers immediately,
+  bypassing the post-arm grace period (tampering is always
+  intentional). Cause key: `tamper`.
+- **Unavailable sensor.** If any of `door_contact` / `motion_main` /
+  `motion_aux` reads `unavailable` or `unknown` (radio dropout, dead
+  battery), the FSM **refuses to auto-arm** and writes a description
+  to `input_text.alarm_sensor_status`. The alarm dashboard surfaces
+  this as an amber banner under the connection-status overlay.
+  Once the sensor recovers the banner clears automatically.
+- **Low battery.** A separate HA automation in `alarm-helpers.yaml`
+  watches the per-device `*_battery_low` binary sensors with a 5-min
+  debounce and pushes to `notify.alarm_recipients` when one trips.
 
 ### Mapping HA user IDs to friendly names
 

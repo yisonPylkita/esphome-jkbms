@@ -15,6 +15,9 @@
   </head>
   <body>
     <div class="stale" id="stale" data-i18n="alarm.haStale">HA — BRAK POŁĄCZENIA</div>
+    <!-- Sensor-degraded banner — populated by Node-RED when any required
+         sensor reads `unavailable` / `unknown`. Hidden when empty. -->
+    <div class="sensor-status" id="sensor-status" role="status" aria-live="polite"></div>
 
     <main>
       <div class="state-hero">

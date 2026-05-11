@@ -14,6 +14,8 @@ function ctx(over = {}) {
     doorOpen: false,
     motionMain: false,
     motionAux: false,
+    tamper: false,
+    sensorsAvailable: true,
     autoArmEnabled: true,
     armingQuietMinutes: 5,
     armingGraceSeconds: 10,
@@ -220,4 +222,62 @@ test('manual disarm: external sets state=disarmed → FSM honours it', () => {
   const r = stepAlarm(ctx({ state: 'disarmed', doorOpen: true }));
   // door is open → can't auto-arm → stays disarmed
   assert.strictEqual(r.state, 'disarmed');
+});
+
+// ---- Tamper (fast-path threat) ----
+
+test('armed + tamper → triggered immediately, bypasses grace', () => {
+  const t0 = 1_000_000;
+  // Within grace window (5 s after entering armed).
+  const r = stepAlarm(
+    ctx({
+      state: 'armed',
+      stateSince: t0,
+      now: t0 + 5 * SEC,
+      tamper: true,
+    }),
+  );
+  assert.strictEqual(r.state, 'triggered');
+  assert.strictEqual(r.triggerReason, 'tamper');
+});
+
+test('arming + tamper → triggered (sensor messed with mid-arm)', () => {
+  const t0 = 1_000_000;
+  const r = stepAlarm(
+    ctx({
+      state: 'arming',
+      stateSince: t0,
+      now: t0 + 2 * MIN,
+      tamper: true,
+    }),
+  );
+  assert.strictEqual(r.state, 'triggered');
+  assert.strictEqual(r.triggerReason, 'tamper');
+});
+
+test('disarmed + tamper → stays disarmed (tamper is only armed-state threat)', () => {
+  const r = stepAlarm(ctx({ state: 'disarmed', tamper: true }));
+  assert.strictEqual(r.state, 'disarmed');
+});
+
+// ---- Unavailable-sensor refusal ----
+
+test('disarmed + sensorsAvailable=false → refuses auto-arm', () => {
+  // Otherwise-quiet room, but one of the sensors reads "unavailable".
+  // We must NOT auto-arm — would arm with a blind sensor.
+  const r = stepAlarm(ctx({ state: 'disarmed', sensorsAvailable: false }));
+  assert.strictEqual(r.state, 'disarmed');
+});
+
+test('disarmed + sensorsAvailable=true → auto-arms as usual', () => {
+  const r = stepAlarm(ctx({ state: 'disarmed', sensorsAvailable: true }));
+  assert.strictEqual(r.state, 'arming');
+});
+
+test('sensorsAvailable defaults to true (backward compat)', () => {
+  // Older Node-RED flow snapshots may not set this field.
+  const c = ctx({ state: 'disarmed' });
+  delete c.sensorsAvailable;
+  const r = stepAlarm(c);
+  assert.strictEqual(r.state, 'arming');
 });
