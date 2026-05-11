@@ -1,3 +1,11 @@
+// SPDX-License-Identifier: MIT
+//
+// Battery-room alarm dashboard — paired with `dashboard/alarm/index.html`.
+// Polls HA's alarm helper entities (input_select.alarm_state, input_boolean.
+// alarm_auto_arm_enabled, the binary_sensor.* sensors, siren.battery_room_siren)
+// and writes back via input_*.* service calls. State translation through
+// `t('alarm.state.*')`; details + cause keys via `t('alarm.detail.*')`.
+
 // Apply i18n to static markup once on first paint, then again whenever
 // setLang() is called downstream. Build-stamp tooltip is dynamic — its
 // {0} param is the relative source path so the user can sha256sum it.

@@ -1,9 +1,9 @@
 # JK BMS over Bluetooth → Home Assistant
 
 ESPHome firmware for an ESP32-C3 that bridges a JK BMS (PB-series, 16-cell
-LFP) over Bluetooth Low Energy to Home Assistant, plus three web dashboards
-served from HA (main / advanced / alarm), plus a Node-RED flow that runs
-the battery-room intrusion alarm.
+LFP) over Bluetooth Low Energy to Home Assistant, plus four web dashboards
+served from HA (bms / alarm / advanced / history), plus a Node-RED flow
+that runs the battery-room intrusion alarm.
 
 ## What this is
 
@@ -18,17 +18,23 @@ the battery-room intrusion alarm.
   bundles the folder into a single `/local/bms-integrated.html`.
 - **`dashboard/advanced/`** — diagnostic view. Live entity list, per-cell
   voltages and resistances, 1h/6h/24h/3d/7d history charts for SOC /
-  current / power / temperature, polling diagnostics, raw JSON. Deploys
-  to `/local/bms-dashboard.html`.
-- **`node-red/battery-room-alarm.flow.json`** — battery-room intrusion
-  alarm FSM (`disarmed → arming → armed → triggered`) driven by Zigbee
-  motion + door sensors, fires the Zigbee siren and a critical-priority
-  push notification on trip.
+  current / power / temperature, polling diagnostics, raw JSON. English
+  only — deliberate choice for the developer-facing view. Deploys to
+  `/local/bms-dashboard.html`.
 - **`dashboard/alarm/`** — single-purpose alarm dashboard. ARM /
   DISARM buttons, live sensor readouts, auto-arm toggle, advanced
   settings (quiet timer, grace seconds, siren duration). Reachable from
   the main BMS dashboard via the `alarm ›` link. Deploys to
   `/local/alarm.html`.
+- **`dashboard/history/`** — alarm history dashboard. Event log with
+  door open/closed timeline, trigger summary cards, stat tiles for
+  armed time / door-open time / trigger + disarm counts; reachable from
+  the alarm dashboard via the `historia ›` link. Deploys to
+  `/local/alarm-history.html`.
+- **`homeassistant/node-red/flows.json`** — full Node-RED flow snapshot
+  including the battery-room intrusion alarm FSM (`disarmed → arming →
+armed → triggered`) driven by Zigbee motion + door sensors, firing the
+  Zigbee siren and critical-priority push notifications on trip.
 - **`homeassistant/alarm-helpers.yaml`** — HA helpers (input_boolean /
   input_number / input_select / input_text) consumed by the alarm flow,
   deployed into `/config/packages/jk_alarm.yaml`.
@@ -60,18 +66,28 @@ just setup
 
 That single command:
 
-- Creates `.venv/` and installs `esphome` into it.
+- Runs `uv sync --all-groups`, which downloads Python 3.14 (per
+  `.python-version`), creates `.venv/`, and installs the dev toolchain
+  (`esphome`, `ruff`, `ty`) from `uv.lock`. No system Python required.
 - Downloads a self-contained Node.js 20 binary into `.tools/` (used by
   `just test`). System node is reused if it's already installed and ≥ 18.
 - Copies `secrets.yaml.example` → `secrets.yaml` (if missing) and links
   `inverter/secrets.yaml` to it.
 - Runs `just check && just test` to validate the bootstrap.
 
-### Prerequisites assumed by `setup.sh`
+### Prerequisites
 
-`git`, `just`, `python3` (≥ 3.10), `curl`, `tar`. macOS (x64 / arm64) and
-Linux (x64 / arm64) are supported. Nothing else needs to be on PATH —
-Node.js, esphome, and any future tooling are downloaded into the repo.
+`git`, `just`, `uv` (Astral's Python package + version manager), `curl`,
+`tar`. macOS (x64 / arm64) and Linux (x64 / arm64) are supported. No
+system Python needed — `uv` downloads the right interpreter into
+`.venv/` itself. Install `uv` with
+`curl -LsSf https://astral.sh/uv/install.sh | sh` if you don't already
+have it.
+
+The Python version is pinned by `.python-version` (currently `3.14`).
+Bumping Python means editing four files in lockstep: `.python-version`,
+`requires-python` in `pyproject.toml`, `target-version` in
+`[tool.ruff]`, and `python-version` in `[tool.ty.environment]`.
 
 ### Home Assistant deploy target
 
@@ -123,38 +139,64 @@ cell voltages, temperatures, balancing, errors) appear under the device.
 ### 5. Deploy the dashboards + helpers
 
 ```
-scripts/deploy-ha.sh
+just deploy
 ```
 
-The script:
+The recipe runs `just check && just test` first, then invokes
+`scripts/deploy-ha.sh`. The script:
 
 1. Reads `ha_host` / `ha_user` / `ha_token` from `secrets.yaml` (env vars
-   override them — `HA_HOST=… HA_TOKEN=… scripts/deploy-ha.sh`).
-2. Substitutes the token into both dashboards, minifies inline CSS / JS,
-   and `scp`s them to `/config/www/`.
+   override them — `HA_HOST=… HA_TOKEN=… just deploy`).
+2. Substitutes the token + build stamp + deploy ID into each dashboard,
+   minifies inline CSS / JS (and inlines `dashboard/lib/*.js`), then
+   `scp`s them to `/config/www/`.
 3. Mirrors `dashboard/fonts/` to `/config/www/fonts/` (DSEG7 Modern Bold
    self-hosted; no external font CDN at runtime).
 4. Pushes `homeassistant/alarm-helpers.yaml` to
    `/config/packages/jk_alarm.yaml` (HA's `packages:` mechanism merges
    the helpers per-domain, idempotent across re-runs).
-5. Runs `ha core check` and reloads `input_boolean` / `input_number` /
+5. Writes `/config/www/version.json` carrying the build's `deployId`;
+   every running dashboard polls it once a minute and reloads itself
+   on a mismatch (see "Self-update" below).
+6. Runs `ha core check` and reloads `input_boolean` / `input_number` /
    `input_text` domains via the HA REST API.
+
+Other useful deploy modes:
+
+- `just dry-run` (`scripts/deploy-ha.sh --dry-run`) — build everything,
+  hash local vs. remote, print a diff, write nothing.
+- `just check-only` (`scripts/deploy-ha.sh --check-only`) — run
+  `check + test` against the deploy target without pushing.
+- `scripts/deploy-ha.sh --skip-checks` — full deploy without
+  `check + test` (emergencies only).
 
 URLs once deployed:
 
-| Page                                  | URL                                          |
-| ------------------------------------- | -------------------------------------------- |
-| Main                                  | `http://<ha>:8123/local/bms-integrated.html` |
-| Diagnostic (history, cells, raw JSON) | `http://<ha>:8123/local/bms-dashboard.html`  |
+| Page          | URL                                          |
+| ------------- | -------------------------------------------- |
+| Main BMS      | `http://<ha>:8123/local/bms-integrated.html` |
+| Alarm         | `http://<ha>:8123/local/alarm.html`          |
+| Alarm history | `http://<ha>:8123/local/alarm-history.html`  |
+| Diagnostic    | `http://<ha>:8123/local/bms-dashboard.html`  |
 
-Press **A** on either page to swap to the other.
+For remote access the canonical entry point is the Tailscale-served
+HTTPS hostname (e.g. `https://fotowoltaika.tailaa1b4.ts.net/local/...`);
+the LAN URL above is the fallback. Each dashboard bakes `HA_URL = ''`
+so requests go to the same origin that served the page — meaning every
+HA-routable URL (LAN IP, Tailscale magic DNS, `tailscale serve`
+HTTPS hostname) works without rebuilding.
+
+Press **A** on the main page to swap to advanced; the `alarm ›`
+link goes to the alarm dashboard, which has its own `historia ›` to
+the history view.
 
 ### 6. Node-RED alarm flow (optional)
 
-`node-red/battery-room-alarm.flow.json` is the battery-room alarm FSM.
-It reads the door + 2 motion sensors, writes `input_select.alarm_state`,
-publishes siren start/stop over MQTT, and pushes a critical-priority
-alert to every `notify.*` target on a trip.
+`homeassistant/node-red/flows.json` is the full Node-RED flow snapshot,
+including the battery-room alarm FSM. It reads the door + 2 motion
+sensors, writes `input_select.alarm_state`, publishes siren start/stop
+over MQTT, and pushes a critical-priority alert to the configured
+mobile_app targets on a trip.
 
 To import:
 
@@ -165,31 +207,47 @@ To import:
    it to the rest.
 3. Deploy.
 
-The MQTT publishes use HA's `mqtt.publish` service (no separate broker
-config in Node-RED needed). The push notification node calls
-`notify.notify`, which broadcasts to every mobile_app integration
-registered with HA.
+`just restore --configs-only` will push the file to
+`/config/node-red/flows.json` automatically; you still need to assign
+the HA server config on first start (see Disaster recovery below).
 
 ## Project layout
 
 ```
 .
 ├── jk-pb-bms.yaml             ESPHome firmware (BLE)
+├── Justfile                   Tooling entry point (`just` lists recipes)
+├── pyproject.toml             Python dev deps (esphome, ruff, ty) via uv
+├── uv.lock                    Locked Python deps
+├── .python-version            Python version pin for uv
+├── package.json               Tiny JS metadata (prettier config consumers)
 ├── secrets.yaml.example       Required secret keys; copy to secrets.yaml
 ├── secrets.yaml               Real secrets (gitignored)
 ├── dashboard/
 │   ├── bms/                   Main dashboard (index.html + style.css + app.js)
 │   ├── alarm/                 Alarm dashboard (index.html + style.css + app.js)
 │   ├── advanced/              Diagnostic dashboard (index.html + style.css + app.js)
-│   ├── lib/                   Shared pure-function helpers (i18n, predict, fsm…)
+│   ├── history/               Alarm-history dashboard (index.html + style.css + app.js)
+│   ├── lib/                   Shared pure-function helpers
+│   │   ├── i18n.js                Polish ↔ English string table
+│   │   ├── predict.js             Rolling-mean power → runtime projection
+│   │   ├── sun.js                 Sunrise/sunset (for the history Gantt shading)
+│   │   ├── zones.js               SOC / V / T zone tables
+│   │   ├── alarm-fsm.js           Canonical alarm FSM (mirrored into flows.json)
+│   │   └── auto-update.js         /local/version.json poller → location.reload()
 │   ├── favicon.svg            PWA icon — vertical battery, dashboard palette
 │   └── fonts/                 Self-hosted DSEG7 Modern Bold (OFL 1.1)
 ├── homeassistant/
-│   └── alarm-helpers.yaml     Helpers consumed by the alarm flow
-├── node-red/
-│   └── battery-room-alarm.flow.json   Battery-room alarm FSM
+│   ├── alarm-helpers.yaml     Helpers consumed by the alarm flow
+│   ├── core/                  /config/configuration.yaml + HA_VERSION
+│   ├── addons/                Per-addon options snapshots (.json)
+│   ├── node-red/              flows.json + settings.js + package.json
+│   └── zigbee2mqtt/           Z2M configuration.yaml (secrets stripped)
+├── tests/                     Node-driven unit tests for dashboard/lib/*
 ├── scripts/
+│   ├── setup.sh               Bootstrap (uv sync + node download)
 │   ├── deploy-ha.sh           One-shot HA deploy
+│   ├── restore-ha.sh          Disaster recovery
 │   ├── fmt.sh                 prettier + ruff format runner
 │   ├── check.sh               Validation gates (run by `just check`)
 │   ├── test.sh                Node test runner
@@ -206,9 +264,9 @@ newer revision.
 
 ## Dashboard architecture
 
-Both dashboards are single-file vanilla web apps. They poll the HA REST
-API at `${HA_URL}/api/states/<entity_id>` with a Bearer token, same-origin
-when served from HA's `/local/` path. Refresh cadence: 1 Hz.
+All four dashboards are single-file vanilla web apps. They poll the HA
+REST API at `${HA_URL}/api/states/<entity_id>` with a Bearer token,
+same-origin when served from HA's `/local/` path. Refresh cadence: 1 Hz.
 
 The main dashboard's runtime prediction uses a rolling 1-hour mean of the
 BMS power signal, projected linearly to either "until empty" (discharging)
@@ -220,6 +278,75 @@ not instantaneous spikes.
 Tokens never enter the repo. Each `*.html` template carries the literal
 placeholder `PASTE_LONG_LIVED_ACCESS_TOKEN_HERE`; `scripts/deploy-ha.sh`
 substitutes it at deploy time. `.gitignore` blocks `dashboard/*.local.html`.
+
+### Self-update
+
+Every dashboard polls `/local/version.json` once a minute and
+`location.reload()`s itself when the server's `deployId` differs from the
+one baked at deploy time. Implementation: `dashboard/lib/auto-update.js`
+plus the `__DEPLOY_ID__` placeholder substituted by `scripts/deploy-ha.sh`.
+Effect: within ~60 seconds of `just deploy`, every open dashboard tab
+reflects the new code without a manual refresh.
+
+### i18n
+
+Dashboards default to Polish (`<html lang="pl">`); English translations
+are maintained as a fallback. Strings live in `dashboard/lib/i18n.js`
+(`T.pl` + `T.en` maps). Static template text uses `data-i18n="key"`,
+`data-i18n-title="key"`, `data-i18n-aria="key"` attributes; `applyI18n()`
+rewrites them at `DOMContentLoaded`. Dynamic strings in JS use
+`t('key', ...args)` with positional `{0}` / `{1}` substitution. To add a
+third language, extend the `T` table with a new top-level key (e.g.
+`de`, `fr`); `_detectLang` accepts any key in `T` whose first two chars
+match `<html lang="...">`. The diagnostic dashboard (`dashboard/advanced/`)
+is deliberately English-only.
+
+### Adding a push-notification target
+
+The Node-RED flow fans the trigger event out to two iPhones via two
+parallel `api-call-service` nodes calling
+`notify.mobile_app_wojciechs_iphone` and `notify.mobile_app_iphone_grzegorz`
+(node IDs `call_notify` and `call_notify_dad`). To add a third device:
+edit `homeassistant/node-red/flows.json`, duplicate the `call_notify_dad`
+node, point its `service` / `action` at the new `notify.mobile_app_*`
+target, then wire it into the FSM trigger fanout (same output as the
+existing two). Apply with `just restore --configs-only` (or import the
+flow manually in Node-RED).
+
+### Mapping HA user IDs to friendly names
+
+The alarm-history dashboard shows `przez panel` / `przez Node-RED` etc.
+based on a hardcoded `USER_MAP` in `dashboard/history/app.js`. New
+family-member HA accounts show up as raw 6-char hex prefixes until
+added. To resolve: open `dashboard/history/app.js`, add the user's full
+UUID → friendly-label mapping to `USER_MAP`, then re-deploy. Find the
+UUID via HA → Settings → People → Users → click user → the URL
+contains it.
+
+### FSM-sync between lib and Node-RED flow
+
+`dashboard/lib/alarm-fsm.js` is the canonical alarm FSM. A byte-equal
+copy lives inside `homeassistant/node-red/flows.json` (the function node
+named "Alarm FSM", between `// SYNC-START` and `// SYNC-END` markers).
+When you edit the lib, you must hand-copy the body into the flow file;
+`scripts/check.sh` fails if the two drift. The check script's failure
+message points at the exact diff. A small Python helper script in git
+history can re-sync mechanically if needed.
+
+## `just` recipes
+
+Run `just` with no arguments to print the recipe list. Highlights:
+
+- `just setup` — first-time bootstrap (uv sync + node download).
+- `just fmt` — format every supported file (prettier + ruff).
+- `just check` — every validation gate (formatter, JSON, esphome
+  config, HTML parse, link integrity, minifier round-trip, FSM-sync,
+  secrets scan).
+- `just test` — Node-driven unit tests against `dashboard/lib/*.js`.
+- `just ci` — `fmt-check + check + test`, what CI runs.
+- `just deploy` — `check + test` then push to HA.
+- `just dry-run` — build + hash + diff vs. remote, no writes.
+- `just restore` — disaster recovery (see below).
 
 ## Disaster recovery — bring up a brand-new HA box from this repo
 
@@ -279,6 +406,13 @@ where these come up):
   account whose password Z2M's `configuration.yaml` references.
 - **HACS.** Re-add via Settings → Devices & Services → Add Integration
   → HACS; sign in with GitHub.
+- **Z2M `<<REPLACE_*>>` secret markers** in
+  `/config/zigbee2mqtt/configuration.yaml` — hand-fill the MQTT
+  password and (optional) network key / pan_id before Z2M's first
+  start.
+- **Node-RED server-config assignment.** On first start, open the
+  editor and assign the HA server config to every imported node — the
+  `flows.json` snapshot has these blanked for portability.
 
 Add-on options are applied via the Supervisor REST API
 (`POST /addons/<slug>/options`). The Supervisor token used for that
