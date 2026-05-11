@@ -30,7 +30,7 @@ test:
 # What CI runs: format-check + every gate + tests, in order.
 ci: fmt-check check test
 
-# Render minified copies of all three dashboards into /tmp for inspection.
+# Render minified copies of all four dashboards into /tmp for inspection.
 minify:
     @mkdir -p /tmp/jkbms-minify
     @for folder in bms alarm advanced history; do \
@@ -41,8 +41,9 @@ minify:
         printf '  %-30s -> %s (%d bytes)\n' "$$src" "$$out" "$$(wc -c < $$out)"; \
     done
 
-# Push to Home Assistant (gated on `just check && just test`).
-deploy: check test
+# Push to Home Assistant. deploy-ha.sh runs `check.sh` + `test.sh` itself
+# (unless --skip-checks), so no prerequisite recipes are needed here.
+deploy:
     scripts/deploy-ha.sh
 
 # Disaster-recovery: re-create the HA box from snapshots in this repo.

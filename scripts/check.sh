@@ -34,12 +34,20 @@ ok "bash -n on $(/bin/ls -1 scripts/*.sh | /usr/bin/wc -l | /usr/bin/tr -d ' ') 
 #    ty subsumes py_compile (it parses the same AST + much more), so we run
 #    it as gate 0 for Python and only fall back to py_compile when the
 #    toolchain isn't on the box (e.g. minimal CI runners without uv).
+#    Single-capture pattern: run once, hold stderr, dump only on failure.
 if [ -x ".venv/bin/ty" ]; then
-  .venv/bin/ty check >/dev/null 2>&1 || { .venv/bin/ty check 2>&1 >&2; fail "ty type check"; }
+  out=$(.venv/bin/ty check 2>&1) || { printf '%s\n' "$out" >&2; fail "ty type check"; }
   ok "ty static type check on scripts/"
 else
   /usr/bin/python3 -m py_compile scripts/*.py || fail "python syntax"
   printf '\033[33m·\033[0m ty absent; falling back to python3 -m py_compile\n'
+fi
+
+# 2b. Python: ruff lint. pyproject.toml configures E/F/I/UP/B/SIM; this
+#     gate is what actually enforces them. Same single-capture pattern.
+if [ -x ".venv/bin/ruff" ]; then
+  out=$(.venv/bin/ruff check 2>&1) || { printf '%s\n' "$out" >&2; fail "ruff check"; }
+  ok "ruff lint on scripts/"
 fi
 
 # 3. JSON validates — every flow / addon snapshot we ship.
@@ -187,7 +195,7 @@ PY
 fi
 
 # 10. secrets.yaml.example covers every key the deploy script reads.
-NEEDS="ha_host ha_user ha_token wifi_ssid wifi_password api_encryption_key ota_password ap_password bms_mac_address"
+NEEDS="ha_host ha_user ha_token wifi_ssid wifi_password api_encryption_key ota_password ap_password bms_mac_address easun_api_encryption_key easun_ota_password"
 for k in $NEEDS; do
   /usr/bin/grep -qE "^${k}:" secrets.yaml.example || fail "secrets.yaml.example missing key: $k"
 done
