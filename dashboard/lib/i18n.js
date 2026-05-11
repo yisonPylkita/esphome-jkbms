@@ -17,12 +17,14 @@ const T = {
     'bms.power': 'moc',
     'bms.idle': 'spoczynek',
     'bms.charging': 'ładowanie',
-    'bms.discharging': 'rozładowanie',
+    'bms.discharging': 'rozładowywanie', // matches the gerund form of "ładowanie"
     'bms.steady': 'stabilnie',
     'bms.toEmpty': 'do rozładowania',
     'bms.toFull': 'do naładowania',
     'bms.alarmLink': 'alarm ›',
-    'bms.alarmTitle': 'Alarm akumulatorów',
+    // "Alarm akumulatorów" alone is ambiguous (could mean a battery-fault
+    // alarm). Clarify it's the alarm guarding the battery ROOM.
+    'bms.alarmTitle': 'Alarm pomieszczenia akumulatorów',
     'bms.alarmAria': 'Otwórz panel alarmu',
     'bms.advLink': 'diag ›',
     'bms.advTitle': 'Diagnostyka (po angielsku)',
@@ -31,7 +33,7 @@ const T = {
     'bms.predict.tomorrow': 'Jutro',
 
     // ---- Alarm dashboard ----
-    'alarm.docTitle': 'Alarm akumulatorów',
+    'alarm.docTitle': 'Alarm pomieszczenia akumulatorów',
     'alarm.appTitle': 'Alarm',
     'alarm.haStale': 'HA — BRAK POŁĄCZENIA',
     'alarm.location': 'pomieszczenie akumulatorów',
@@ -39,39 +41,52 @@ const T = {
     'alarm.btnDisarm': 'ROZBRÓJ',
     'alarm.sensor.door': 'drzwi',
     'alarm.sensor.motionMain': 'ruch (główny)',
-    'alarm.sensor.motionAux': 'ruch (zapasowy)',
+    // `pomocniczy` ("auxiliary") matches the role of a secondary
+    // coverage sensor better than `zapasowy` ("spare / on standby").
+    'alarm.sensor.motionAux': 'ruch (pomocniczy)',
     'alarm.sensor.siren': 'syrena',
     'alarm.sensor.door.open': 'OTWARTE',
     'alarm.sensor.door.closed': 'zamknięte',
     'alarm.sensor.motion.detected': 'RUCH',
-    'alarm.sensor.motion.quiet': 'cisza',
-    'alarm.sensor.siren.ringing': 'DZWONI',
-    'alarm.sensor.siren.idle': 'spoczynek',
+    // "cisza" reads as acoustic silence; for a PIR sensor "spokój"
+    // (calm / no activity) is the right register.
+    'alarm.sensor.motion.quiet': 'spokój',
+    // A siren wails, it doesn't ring — and what the user wants to know
+    // is whether it's on, not the verb for its sound. "WŁĄCZONA" is
+    // unambiguous; matches "wyłączona" for the off state.
+    'alarm.sensor.siren.ringing': 'WŁĄCZONA',
+    'alarm.sensor.siren.idle': 'wyłączona',
     'alarm.autoarm.label': 'auto-uzbrajanie',
-    'alarm.autoarm.hint': 'wyłącz, gdy pracujesz w pomieszczeniu',
+    // "kiedy jesteś w pomieszczeniu" is broader than "pracujesz" — covers
+    // any time the user is inside, not just working.
+    'alarm.autoarm.hint': 'wyłącz, kiedy jesteś w pomieszczeniu',
     'alarm.autoarm.aria': 'auto-uzbrajanie włączone',
     'alarm.adv.summary': 'ustawienia zaawansowane',
-    'alarm.adv.quiet.name': 'czas ciszy do uzbrojenia (min)',
+    'alarm.adv.quiet.name': 'okres ciszy przed uzbrojeniem (min)',
+    // Grammar fix: previous version mixed singular agreement with plural
+    // `minut` and put `wymagane` in the wrong case.
     'alarm.adv.quiet.desc':
-      'ile minut zamkniętych drzwi i braku ruchu jest wymagane przed auto-uzbrojeniem',
-    'alarm.adv.grace.name': 'karencja po uzbrojeniu (s)',
+      'liczba minut zamkniętych drzwi i braku ruchu wymaganych przed auto-uzbrojeniem',
+    // "karencja" is legal/medical jargon. The alarm-domain Polish term
+    // for the exit-delay grace window is "czas wyjścia".
+    'alarm.adv.grace.name': 'czas wyjścia (s)',
     'alarm.adv.grace.desc':
       'ile sekund po uzbrojeniu czujniki są ignorowane (czas na opuszczenie pomieszczenia)',
-    'alarm.adv.siren.name': 'czas trwania syreny (s)',
+    'alarm.adv.siren.name': 'czas pracy syreny (s)',
     'alarm.adv.siren.desc':
-      'jak długo dzwoni syrena po wyzwoleniu; stan alarmu pozostaje aktywny aż do rozbrojenia',
+      'jak długo wyje syrena po wyzwoleniu; alarm pozostaje aktywny aż do rozbrojenia',
     'alarm.toggle.main.text': '‹ główny',
     'alarm.toggle.main.title': 'Wróć do panelu głównego',
     'alarm.state.disarmed': 'ROZBROJONY',
     'alarm.state.arming': 'UZBRAJANIE',
     'alarm.state.armed': 'UZBROJONY',
     'alarm.state.triggered': 'ALARM',
-    'alarm.detail.arming': 'uzbrojenie za {0} — musi panować cisza',
+    'alarm.detail.arming': 'uzbrojenie za {0} — musi być cicho',
     'alarm.detail.armed': 'uzbrojony od {0}',
     'alarm.detail.triggered': '{0} · {1} temu',
     'alarm.cause.door': 'otwarcie drzwi',
     'alarm.cause.motion_main': 'ruch (główny)',
-    'alarm.cause.motion_aux': 'ruch (zapasowy)',
+    'alarm.cause.motion_aux': 'ruch (pomocniczy)',
 
     // ---- Build stamp tooltip (shared, {0} = source filename) ----
     'buildstamp.title':

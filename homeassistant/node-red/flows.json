@@ -302,7 +302,7 @@
         "name": "push: critical alarm (me)",
         "server": "",
         "version": 7,
-        "data": "{\n  \"message\": \"Wyzwolony przez: \" & $replace($replace($replace(payload.reason, \"motion_main\", \"ruch (g\u0142\u00f3wny)\"), \"motion_aux\", \"ruch (zapasowy)\"), \"door\", \"otwarcie drzwi\"),\n  \"title\": \"\\uD83D\\uDEA8 Alarm akumulator\u00f3w\",\n  \"data\": {\n    \"push\": { \"sound\": { \"critical\": 1, \"name\": \"default\", \"volume\": 1.0 }, \"interruption-level\": \"critical\" },\n    \"channel\": \"alarm\",\n    \"importance\": \"high\",\n    \"ttl\": 0,\n    \"priority\": \"high\",\n    \"actions\": [\n      { \"action\": \"URI\", \"title\": \"Otw\u00f3rz panel\", \"uri\": \"/local/alarm.html\" }\n    ]\n  }\n}",
+        "data": "{\n  \"message\": \"Wyzwolony przez: \" & $replace($replace($replace(payload.reason, \"motion_main\", \"ruch (g\u0142\u00f3wny)\"), \"motion_aux\", \"ruch (pomocniczy)\"), \"door\", \"otwarcie drzwi\"),\n  \"title\": \"\\uD83D\\uDEA8 Alarm pomieszczenia akumulator\u00f3w\",\n  \"data\": {\n    \"push\": { \"sound\": { \"critical\": 1, \"name\": \"default\", \"volume\": 1.0 }, \"interruption-level\": \"critical\" },\n    \"channel\": \"alarm\",\n    \"importance\": \"high\",\n    \"ttl\": 0,\n    \"priority\": \"high\",\n    \"actions\": [\n      { \"action\": \"URI\", \"title\": \"Otw\u00f3rz panel\", \"uri\": \"/local/alarm.html\" }\n    ]\n  }\n}",
         "dataType": "jsonata",
         "domain": "notify",
         "service": "mobile_app_wojciechs_iphone",
@@ -388,7 +388,7 @@
         "server": "",
         "version": 7,
         "domain": "notify",
-        "data": "{\n  \"message\": \"Wyzwolony przez: \" & $replace($replace($replace(payload.reason, \"motion_main\", \"ruch (g\u0142\u00f3wny)\"), \"motion_aux\", \"ruch (zapasowy)\"), \"door\", \"otwarcie drzwi\"),\n  \"title\": \"\\uD83D\\uDEA8 Alarm akumulator\u00f3w\",\n  \"data\": {\n    \"push\": { \"sound\": { \"critical\": 1, \"name\": \"default\", \"volume\": 1.0 }, \"interruption-level\": \"critical\" },\n    \"channel\": \"alarm\",\n    \"importance\": \"high\",\n    \"ttl\": 0,\n    \"priority\": \"high\",\n    \"actions\": [\n      { \"action\": \"URI\", \"title\": \"Otw\u00f3rz panel\", \"uri\": \"/local/alarm.html\" }\n    ]\n  }\n}",
+        "data": "{\n  \"message\": \"Wyzwolony przez: \" & $replace($replace($replace(payload.reason, \"motion_main\", \"ruch (g\u0142\u00f3wny)\"), \"motion_aux\", \"ruch (pomocniczy)\"), \"door\", \"otwarcie drzwi\"),\n  \"title\": \"\\uD83D\\uDEA8 Alarm pomieszczenia akumulator\u00f3w\",\n  \"data\": {\n    \"push\": { \"sound\": { \"critical\": 1, \"name\": \"default\", \"volume\": 1.0 }, \"interruption-level\": \"critical\" },\n    \"channel\": \"alarm\",\n    \"importance\": \"high\",\n    \"ttl\": 0,\n    \"priority\": \"high\",\n    \"actions\": [\n      { \"action\": \"URI\", \"title\": \"Otw\u00f3rz panel\", \"uri\": \"/local/alarm.html\" }\n    ]\n  }\n}",
         "dataType": "jsonata",
         "wires": [
             []
