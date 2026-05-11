@@ -426,15 +426,6 @@ async function tick() {
   }
 }
 
-// pulse keyframes (added once)
-const styleSheet = document.styleSheets[0];
-try {
-  styleSheet.insertRule(
-    '@keyframes bms-pulse{0%,100%{opacity:1}50%{opacity:.55}}',
-    styleSheet.cssRules.length,
-  );
-} catch {}
-
 buildGauge();
 buildBatteryBar();
 tick();

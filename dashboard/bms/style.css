@@ -140,6 +140,22 @@ body {
   box-shadow: 0 0 8px var(--bms-red-glow);
   animation: bms-pulse 1.2s ease-in-out infinite;
 }
+@keyframes bms-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stale .dot,
+  #bolt-icon {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
 
 /* TopBar — voltage left, temperature right, both at the same baseline.
        In portrait it stays in the column flex flow (default). In landscape
