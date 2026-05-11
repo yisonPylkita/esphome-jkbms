@@ -41,6 +41,7 @@ const TEMP_HISTORY_ENTITIES = [
 
 const isDemo = new URLSearchParams(location.search).has('demo');
 const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, '0');
 
 // -------- API --------
 async function fetchState(entityId) {
