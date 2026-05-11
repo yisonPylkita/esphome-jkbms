@@ -96,6 +96,11 @@ else
   GIT_DIRTY=""
 fi
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%MZ)"
+# Single deploy id stamped into every dashboard's `installAutoUpdate(...)`
+# call. The version.json we push at the end of the deploy carries the
+# same string; each dashboard polls /local/version.json once a minute
+# and `location.reload()`s itself if the id changes.
+DEPLOY_ID="${GIT_COMMIT}${GIT_DIRTY}-$(date -u +%s)"
 
 declare -a BUILT_PAIRS=()
 # Source layout (component-style folders under dashboard/):
@@ -120,7 +125,8 @@ for entry in "bms:bms-integrated.html" "advanced:bms-dashboard.html" "alarm:alar
   # happen against the inlined output, not the bare source HTML.
   .venv/bin/python "$MINIFY" --source-dir "$DASHBOARD_DIR/$folder" < "$src" \
     | /usr/bin/sed -e "s|PASTE_LONG_LIVED_ACCESS_TOKEN_HERE|$HA_TOKEN|" \
-                   -e "s|__BUILD_STAMP__|${STAMP}|" > "$WORK/$outname"
+                   -e "s|__BUILD_STAMP__|${STAMP}|" \
+                   -e "s|__DEPLOY_ID__|${DEPLOY_ID}|g" > "$WORK/$outname"
   after=$(/usr/bin/wc -c < "$WORK/$outname")
   printf '   built %-30s %d -> %d bytes (%d%%)  stamp=%s\n' \
     "$folder/index.html → $outname" "$before" "$after" $((after * 100 / before)) "$src_hash"
@@ -173,6 +179,16 @@ for pair in "${BUILT_PAIRS[@]}"; do
   remote_path="${pair#*=}"
   $SCP "$local_path" "$HA_USER@$HA_HOST:$remote_path"
 done
+
+# ---- 3a. version.json — the manifest each dashboard polls once a
+#          minute to decide whether to reload itself. Always one short
+#          file, deployId matches the value baked into every dashboard
+#          via the __DEPLOY_ID__ sed substitution above.
+cat > "$WORK/version.json" <<EOF
+{"deployId":"${DEPLOY_ID}","deployedAt":"${BUILD_TIME}","branch":"${GIT_BRANCH}","commit":"${GIT_COMMIT}${GIT_DIRTY}"}
+EOF
+echo "→ Pushing version.json to /config/www/..."
+$SCP "$WORK/version.json" "$HA_USER@$HA_HOST:/config/www/version.json"
 
 # ---- 3b. Favicon (vertical-battery SVG used by all three dashboards). ----
 if [ -f "$HERE/dashboard/favicon.svg" ]; then
