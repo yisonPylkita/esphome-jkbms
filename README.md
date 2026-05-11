@@ -5,6 +5,8 @@ LFP) over Bluetooth Low Energy to Home Assistant, plus four web dashboards
 served from HA (bms / alarm / advanced / history), plus a Node-RED flow
 that runs the battery-room intrusion alarm.
 
+![Main BMS dashboard — half-circle SOC gauge, 12-cell battery bar, power + runtime prediction](docs/screenshots/dashboard-main.png)
+
 ## What this is
 
 - **`jk-pb-bms.yaml`** — the ESPHome firmware. ESP32-C3 connects to the BMS
