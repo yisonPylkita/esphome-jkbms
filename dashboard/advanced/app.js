@@ -40,27 +40,19 @@ const TEMP_HISTORY_ENTITIES = [
 // ============================================================
 
 const isDemo = new URLSearchParams(location.search).has('demo');
-const $ = (id) => document.getElementById(id);
 
 // -------- API --------
+// Thin wrappers around haGetState / haGetAllStates (lib/ha.js) so the
+// demo-mode branch stays local to this file. Live HA calls delegate to
+// the shared client.
 async function fetchState(entityId) {
   if (isDemo) return demoState(entityId);
-  const r = await fetch(`${HA_URL}/api/states/${entityId}`, {
-    headers: { Authorization: 'Bearer ' + TOKEN },
-    cache: 'no-store',
-  });
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + entityId);
-  return r.json();
+  return haGetState(entityId);
 }
 
 async function fetchAllStates() {
   if (isDemo) return demoAllStates();
-  const r = await fetch(`${HA_URL}/api/states`, {
-    headers: { Authorization: 'Bearer ' + TOKEN },
-    cache: 'no-store',
-  });
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' /api/states');
-  return r.json();
+  return haGetAllStates();
 }
 
 function demoState(id) {
@@ -502,19 +494,18 @@ async function fetchHistory(hours) {
   // (BMS power changes constantly — a 24h window without these flags
   // returns ~50k samples per entity × 9 entities). With them, a 24h
   // request finishes in well under a second.
-  const url =
-    `${HA_URL}/api/history/period/${start.toISOString()}` +
+  // lib/ha.js's `haHistory` is single-entity + no flags; this dashboard's
+  // multi-entity + significant_changes_only request goes through the
+  // shared `_haFetch` helper so the bearer-token + error-handling logic
+  // stays in one place.
+  const path =
+    `/api/history/period/${start.toISOString()}` +
     `?filter_entity_id=${HISTORY_ENTITIES.join(',')}` +
     `&minimal_response` +
     `&significant_changes_only` +
     `&no_attributes` +
     `&end_time=${end.toISOString()}`;
-  const r = await fetch(url, {
-    headers: { Authorization: 'Bearer ' + TOKEN },
-    cache: 'no-store',
-  });
-  if (!r.ok) throw new Error('history HTTP ' + r.status);
-  const arr = await r.json();
+  const arr = await _haFetch(path);
   // arr is parallel to filter_entity_id order; sometimes HA returns subset if entity has no data.
   const byEntity = {};
   for (const series of arr) {
@@ -948,8 +939,6 @@ refreshHistoryIfStale()
   .catch(() => renderHistory());
 
 // -------- Tick --------
-let timer = null;
-
 async function tick() {
   const t0 = performance.now();
   try {
@@ -969,19 +958,6 @@ async function tick() {
     feed.unshift({ ts, id: '__error', prev: '', next: e.message || String(e), unit: '' });
     if (feed.length > FEED_MAX) feed.length = FEED_MAX;
   }
-  schedule();
 }
 
-function schedule() {
-  if (timer) clearTimeout(timer);
-  timer = setTimeout(tick, POLL_MS_ADVANCED);
-}
-
-tick();
-
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    if (timer) clearTimeout(timer);
-    tick();
-  }
-});
+startPolling(tick, POLL_MS_ADVANCED);

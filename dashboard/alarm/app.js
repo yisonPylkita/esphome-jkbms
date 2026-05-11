@@ -24,33 +24,14 @@ const E = {
   siren: 'siren.battery_room_siren',
 };
 
-const $ = (id) => document.getElementById(id);
-
-async function getState(id) {
-  const r = await fetch(`${HA_URL}/api/states/${id}`, {
-    headers: { Authorization: 'Bearer ' + TOKEN },
-    cache: 'no-store',
-  });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
-}
-async function callService(domain, service, data) {
-  const r = await fetch(`${HA_URL}/api/services/${domain}/${service}`, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-}
-
 // ---- Actions ----
 $('btn-arm').onclick = () =>
-  callService('input_select', 'select_option', { entity_id: E.state, option: 'arming' });
+  haCallService('input_select', 'select_option', { entity_id: E.state, option: 'arming' });
 $('btn-disarm').onclick = () =>
-  callService('input_select', 'select_option', { entity_id: E.state, option: 'disarmed' });
+  haCallService('input_select', 'select_option', { entity_id: E.state, option: 'disarmed' });
 $('switch-autoarm').onclick = (e) => {
   const isOn = e.currentTarget.classList.contains('on');
-  callService('input_boolean', isOn ? 'turn_off' : 'turn_on', { entity_id: E.autoArm });
+  haCallService('input_boolean', isOn ? 'turn_off' : 'turn_on', { entity_id: E.autoArm });
 };
 
 // Bind advanced inputs — write on change.
@@ -59,7 +40,7 @@ function bindNumber(inputId, entity) {
   el.addEventListener('change', () => {
     const v = parseFloat(el.value);
     if (Number.isFinite(v))
-      callService('input_number', 'set_value', { entity_id: entity, value: v });
+      haCallService('input_number', 'set_value', { entity_id: entity, value: v });
   });
 }
 bindNumber('cfg-quiet-min', E.quietMin);
@@ -97,16 +78,16 @@ async function tick() {
   try {
     const [st, autoArm, quiet, grace, siren, reason, door, mMain, mAux, sirenE] = await Promise.all(
       [
-        getState(E.state),
-        getState(E.autoArm),
-        getState(E.quietMin),
-        getState(E.graceSec),
-        getState(E.sirenSec),
-        getState(E.reason).catch(() => null),
-        getState(E.door).catch(() => null),
-        getState(E.motionMain).catch(() => null),
-        getState(E.motionAux).catch(() => null),
-        getState(E.siren).catch(() => null),
+        haGetState(E.state),
+        haGetState(E.autoArm),
+        haGetState(E.quietMin),
+        haGetState(E.graceSec),
+        haGetState(E.sirenSec),
+        haGetState(E.reason).catch(() => null),
+        haGetState(E.door).catch(() => null),
+        haGetState(E.motionMain).catch(() => null),
+        haGetState(E.motionAux).catch(() => null),
+        haGetState(E.siren).catch(() => null),
       ],
     );
     $('stale').classList.remove('visible');
@@ -189,8 +170,7 @@ async function tick() {
   }
 }
 
-tick();
-setInterval(tick, POLL_MS);
+startPolling(tick, POLL_MS);
 
 document.addEventListener('keydown', (e) => {
   if (e.target.matches?.('input, textarea, select')) return;

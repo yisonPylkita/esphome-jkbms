@@ -30,39 +30,10 @@ const USER_MAP = {
 // the box ever moves.
 const SITE = { lat: 52.2297, lon: 21.0122 };
 
-const $ = (id) => document.getElementById(id);
-
-// ---- HA REST helpers ----
-
-async function ha(path) {
-  const r = await fetch(`${HA_URL}${path}`, {
-    headers: { Authorization: 'Bearer ' + TOKEN },
-    cache: 'no-store',
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status} on ${path}`);
-  return r.json();
-}
-
-// `/api/logbook/<from>?entity=...&end_time=...` returns the entity's
-// timeline AS SEEN by the logbook (i.e. only logged state changes,
-// not every recorder row). Good for arm/disarm events.
-async function fetchLogbook(entity, from, to) {
-  const q = new URLSearchParams({ entity, end_time: to.toISOString() });
-  return ha(`/api/logbook/${from.toISOString()}?${q.toString()}`);
-}
-
-// `/api/history/period/<from>?filter_entity_id=...&end_time=...`
-// returns every recorder sample. We need it for the door's full state
-// timeline (logbook coalesces close-together flips).
-async function fetchHistory(entity, from, to) {
-  const q = new URLSearchParams({
-    filter_entity_id: entity,
-    end_time: to.toISOString(),
-    minimal_response: 'true',
-  });
-  const raw = await ha(`/api/history/period/${from.toISOString()}?${q.toString()}`);
-  return Array.isArray(raw[0]) ? raw[0] : [];
-}
+// HA REST helpers — `haLogbook` and `haHistory` come from lib/ha.js
+// (`/api/logbook/<from>?entity=...` for arm/disarm events; the latter
+// returns every recorder sample, needed because logbook coalesces
+// close-together door flips).
 
 // ---- Time formatters ----
 
@@ -330,10 +301,10 @@ async function load() {
   const { from, to } = rangeBounds(_activeRange);
   try {
     const [alarmLog, reasonLog, alarmHistRaw, doorHistRaw] = await Promise.all([
-      fetchLogbook(E.alarmState, from, to),
-      fetchLogbook(E.triggerReason, from, to),
-      fetchHistory(E.alarmState, from, to),
-      fetchHistory(E.door, from, to),
+      haLogbook(E.alarmState, from, to),
+      haLogbook(E.triggerReason, from, to),
+      haHistory(E.alarmState, from, to),
+      haHistory(E.door, from, to),
     ]);
     renderStats(alarmHistRaw, doorHistRaw, from, to);
     renderDoorGantt(doorHistRaw, from, to);
@@ -360,8 +331,8 @@ document.addEventListener('DOMContentLoaded', () => {
       load();
     });
   }
-  load();
   // Light refresh every 30 s so the dashboard reflects new events
-  // without a page reload.
-  setInterval(load, 30 * 1000);
+  // without a page reload. `startPolling` also re-fires on tab visibility,
+  // so swiping back from a backgrounded tab shows current state immediately.
+  startPolling(load, 30 * 1000);
 });
