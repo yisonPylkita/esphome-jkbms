@@ -322,15 +322,10 @@ Then `just deploy` (pushes the updated helpers) and restart HA core
 (notify groups are registered at startup; `homeassistant.reload_core_config`
 is enough). One place to edit; no Node-RED flow surgery needed.
 
-### Sensor health: tamper, unavailable, low battery
+### Sensor health: unavailable + low battery
 
 The FSM treats sensor problems as part of the alarm posture:
 
-- **Tamper.** Z2M exposes `binary_sensor.battery_room_door_tamper` and
-  `battery_room_motion_aux_tamper`. The FSM watches both; any
-  positive reading while in `arming` or `armed` triggers immediately,
-  bypassing the post-arm grace period (tampering is always
-  intentional). Cause key: `tamper`.
 - **Unavailable sensor.** If any of `door_contact` / `motion_main` /
   `motion_aux` reads `unavailable` or `unknown` (radio dropout, dead
   battery), the FSM **refuses to auto-arm** and writes a description

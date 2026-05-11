@@ -14,7 +14,6 @@ function ctx(over = {}) {
     doorOpen: false,
     motionMain: false,
     motionAux: false,
-    tamper: false,
     sensorsAvailable: true,
     autoArmEnabled: true,
     armingQuietMinutes: 5,
@@ -221,42 +220,6 @@ test('manual disarm: external sets state=disarmed → FSM honours it', () => {
   // FSM treats it as ground truth and continues from there.
   const r = stepAlarm(ctx({ state: 'disarmed', doorOpen: true }));
   // door is open → can't auto-arm → stays disarmed
-  assert.strictEqual(r.state, 'disarmed');
-});
-
-// ---- Tamper (fast-path threat) ----
-
-test('armed + tamper → triggered immediately, bypasses grace', () => {
-  const t0 = 1_000_000;
-  // Within grace window (5 s after entering armed).
-  const r = stepAlarm(
-    ctx({
-      state: 'armed',
-      stateSince: t0,
-      now: t0 + 5 * SEC,
-      tamper: true,
-    }),
-  );
-  assert.strictEqual(r.state, 'triggered');
-  assert.strictEqual(r.triggerReason, 'tamper');
-});
-
-test('arming + tamper → triggered (sensor messed with mid-arm)', () => {
-  const t0 = 1_000_000;
-  const r = stepAlarm(
-    ctx({
-      state: 'arming',
-      stateSince: t0,
-      now: t0 + 2 * MIN,
-      tamper: true,
-    }),
-  );
-  assert.strictEqual(r.state, 'triggered');
-  assert.strictEqual(r.triggerReason, 'tamper');
-});
-
-test('disarmed + tamper → stays disarmed (tamper is only armed-state threat)', () => {
-  const r = stepAlarm(ctx({ state: 'disarmed', tamper: true }));
   assert.strictEqual(r.state, 'disarmed');
 });
 

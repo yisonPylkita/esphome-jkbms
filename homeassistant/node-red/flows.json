@@ -233,7 +233,7 @@
         "type": "function",
         "z": "tab_battery_room_alarm",
         "name": "Alarm FSM",
-        "func": "// === Battery-room alarm FSM ===\n// Synced from dashboard/lib/alarm-fsm.js \u2014 scripts/check.sh enforces equality.\n// SYNC-START\nfunction stepAlarm(ctx) {\n  const motion = !!(ctx.motionMain || ctx.motionAux);\n  const door = !!ctx.doorOpen;\n  const tamper = !!ctx.tamper;\n  const sensorsAvailable = ctx.sensorsAvailable !== false;\n  let state = ctx.state || 'disarmed';\n  let stateSince = ctx.stateSince || ctx.now;\n  let triggerReason = ctx.triggerReason || '';\n  const set = (s, reason) => {\n    state = s;\n    stateSince = ctx.now;\n    if (reason !== undefined) triggerReason = reason;\n  };\n  switch (state) {\n    case 'disarmed': {\n      if (ctx.autoArmEnabled && !door && !motion && !tamper && sensorsAvailable) {\n        set('arming');\n      }\n      break;\n    }\n    case 'arming': {\n      if (tamper) {\n        set('triggered', 'tamper');\n        break;\n      }\n      if (door || motion) {\n        stateSince = ctx.now;\n        break;\n      }\n      const elapsedMs = ctx.now - stateSince;\n      const requiredMs = (ctx.armingQuietMinutes || 5) * 60 * 1000;\n      if (elapsedMs >= requiredMs) set('armed');\n      break;\n    }\n    case 'armed': {\n      if (tamper) {\n        set('triggered', 'tamper');\n        break;\n      }\n      const sinceArmedMs = ctx.now - stateSince;\n      const graceMs = (ctx.armingGraceSeconds || 10) * 1000;\n      if (sinceArmedMs < graceMs) break;\n      const reasons = [];\n      if (door) reasons.push('door');\n      if (ctx.motionMain) reasons.push('motion_main');\n      if (ctx.motionAux) reasons.push('motion_aux');\n      if (reasons.length) set('triggered', reasons.join(' \u00b7 '));\n      break;\n    }\n    case 'triggered': {\n      break;\n    }\n  }\n  let sirenOn = false;\n  if (state === 'triggered') {\n    const sirenMs = (ctx.sirenDurationS || 60) * 1000;\n    sirenOn = ctx.now - stateSince < sirenMs;\n  }\n  return {\n    state,\n    stateSince,\n    sirenOn,\n    triggerReason,\n    transitioned: state !== (ctx.state || 'disarmed'),\n  };\n\n}\n// SYNC-END\n\nconst ha = global.get('homeassistant')?.homeAssistant?.states;\nif (!ha) {\n    node.warn('HA global state unavailable \u2014 enable \"Expose to Node-RED\" in server config');\n    return null;\n}\n\nconst num = (id, def) => {\n    const s = ha[id]?.state;\n    const n = parseFloat(s);\n    return Number.isFinite(n) ? n : def;\n};\nconst isOn = (id) => ha[id]?.state === 'on';\nconst stateOf = (id) => ha[id]?.state;\n\nconst now = Date.now();\nconst persisted = flow.get('alarm_state_meta') || {};\nconst stateFromHA = stateOf('input_select.alarm_state') || 'disarmed';\n\n// If HA state diverges from our last-seen (because the user wrote it from\n// the dashboard), treat it as the new starting point and reset stateSince.\nlet stateSince = persisted.stateSince || now;\nif (persisted.lastState !== stateFromHA) {\n    stateSince = now;\n}\n\nconst tamperDoor = isOn('binary_sensor.battery_room_door_tamper');\nconst tamperMotionAux = isOn('binary_sensor.battery_room_motion_aux_tamper');\nconst tamper = tamperDoor || tamperMotionAux;\n\n// Refuse auto-arm if any required sensor reads 'unavailable' or 'unknown'.\n// Otherwise the FSM would treat a missing door reading as \"door closed\"\n// and arm with a blind sensor. Caught one of these in the wild.\nconst requiredSensors = [\n    'binary_sensor.battery_room_door_contact',\n    'binary_sensor.battery_room_motion_main_occupancy',\n    'binary_sensor.battery_room_motion_aux_occupancy',\n];\nconst sensorsAvailable = requiredSensors.every((id) => {\n    const s = ha[id]?.state;\n    return s && s !== 'unavailable' && s !== 'unknown';\n});\n\nconst ctx = {\n    now,\n    state: stateFromHA,\n    stateSince,\n    doorOpen:           isOn('binary_sensor.battery_room_door_contact'),\n    motionMain:         isOn('binary_sensor.battery_room_motion_main_occupancy'),\n    motionAux:          isOn('binary_sensor.battery_room_motion_aux_occupancy'),\n    tamper,\n    sensorsAvailable,\n    autoArmEnabled:     isOn('input_boolean.alarm_auto_arm_enabled'),\n    armingQuietMinutes: num('input_number.alarm_arming_quiet_minutes', 5),\n    armingGraceSeconds: num('input_number.alarm_arming_grace_seconds', 10),\n    sirenDurationS:     num('input_number.alarm_siren_duration_s', 60),\n    triggerReason:      ha['input_text.alarm_trigger_reason']?.state || '',\n};\n\nconst result = stepAlarm(ctx);\nflow.set('alarm_state_meta', { lastState: result.state, stateSince: result.stateSince });\n\n// Decide what to push downstream.\nconst stateChanged = result.state !== stateFromHA;\nconst nowTriggered = stateChanged && result.state === 'triggered';\nconst leftTriggered = stateChanged && stateFromHA === 'triggered';\nconst sirenWasOn = flow.get('alarm_siren_on') === true;\nconst sirenStateChanged = result.sirenOn !== sirenWasOn;\nflow.set('alarm_siren_on', result.sirenOn);\n\nnode.status({\n    fill: result.state === 'triggered' ? 'red'\n        : result.state === 'armed' ? 'green'\n        : result.state === 'arming' ? 'yellow'\n        : 'grey',\n    shape: 'dot',\n    text: `${result.state} | door=${ctx.doorOpen?'open':'closed'} m1=${ctx.motionMain?'1':'0'} m2=${ctx.motionAux?'1':'0'} siren=${result.sirenOn?'on':'off'}`\n});\n\nconst out = [null, null, null, null, null];\nif (stateChanged) {\n    out[0] = { topic: 'state', payload: result.state };\n    out[1] = { topic: 'reason', payload: result.triggerReason };\n}\nif (sirenStateChanged) {\n    out[2] = result.sirenOn\n        ? { payload: 'on',  duration: Math.round(ctx.sirenDurationS) }\n        : { payload: 'off' };\n}\nif (nowTriggered) {\n    out[3] = { payload: { reason: result.triggerReason } };\n}\n\n// Sensor-status writeback: persist a human-readable string when any\n// required sensor is unavailable, clear it when they all come back.\n// Emits only on transition so the recorder doesn't see 1 Hz writes.\nconst sensorStatusText = sensorsAvailable\n    ? ''\n    : 'czujnik niedost\u0119pny: ' + requiredSensors\n        .filter((id) => {\n            const s = ha[id]?.state;\n            return !s || s === 'unavailable' || s === 'unknown';\n        })\n        .join(', ');\nconst prevSensorStatus = flow.get('alarm_sensor_status_text') || '';\nif (sensorStatusText !== prevSensorStatus) {\n    flow.set('alarm_sensor_status_text', sensorStatusText);\n    out[4] = { topic: 'sensor_status', payload: sensorStatusText };\n}\n\nreturn out;\n",
+        "func": "// === Battery-room alarm FSM ===\n// Synced from dashboard/lib/alarm-fsm.js \u2014 scripts/check.sh enforces equality.\n// SYNC-START\nfunction stepAlarm(ctx) {\n  const motion = !!(ctx.motionMain || ctx.motionAux);\n  const door = !!ctx.doorOpen;\n  const sensorsAvailable = ctx.sensorsAvailable !== false;\n  let state = ctx.state || 'disarmed';\n  let stateSince = ctx.stateSince || ctx.now;\n  let triggerReason = ctx.triggerReason || '';\n  const set = (s, reason) => {\n    state = s;\n    stateSince = ctx.now;\n    if (reason !== undefined) triggerReason = reason;\n  };\n  switch (state) {\n    case 'disarmed': {\n      if (ctx.autoArmEnabled && !door && !motion && sensorsAvailable) {\n        set('arming');\n      }\n      break;\n    }\n    case 'arming': {\n      if (door || motion) {\n        stateSince = ctx.now;\n        break;\n      }\n      const elapsedMs = ctx.now - stateSince;\n      const requiredMs = (ctx.armingQuietMinutes || 5) * 60 * 1000;\n      if (elapsedMs >= requiredMs) set('armed');\n      break;\n    }\n    case 'armed': {\n      const sinceArmedMs = ctx.now - stateSince;\n      const graceMs = (ctx.armingGraceSeconds || 10) * 1000;\n      if (sinceArmedMs < graceMs) break;\n      const reasons = [];\n      if (door) reasons.push('door');\n      if (ctx.motionMain) reasons.push('motion_main');\n      if (ctx.motionAux) reasons.push('motion_aux');\n      if (reasons.length) set('triggered', reasons.join(' \u00b7 '));\n      break;\n    }\n    case 'triggered': {\n      break;\n    }\n  }\n  let sirenOn = false;\n  if (state === 'triggered') {\n    const sirenMs = (ctx.sirenDurationS || 60) * 1000;\n    sirenOn = ctx.now - stateSince < sirenMs;\n  }\n  return {\n    state,\n    stateSince,\n    sirenOn,\n    triggerReason,\n    transitioned: state !== (ctx.state || 'disarmed'),\n  };\n\n}\n// SYNC-END\n\nconst ha = global.get('homeassistant')?.homeAssistant?.states;\nif (!ha) {\n    node.warn('HA global state unavailable \u2014 enable \"Expose to Node-RED\" in server config');\n    return null;\n}\n\nconst num = (id, def) => {\n    const s = ha[id]?.state;\n    const n = parseFloat(s);\n    return Number.isFinite(n) ? n : def;\n};\nconst isOn = (id) => ha[id]?.state === 'on';\nconst stateOf = (id) => ha[id]?.state;\n\nconst now = Date.now();\nconst persisted = flow.get('alarm_state_meta') || {};\nconst stateFromHA = stateOf('input_select.alarm_state') || 'disarmed';\n\n// If HA state diverges from our last-seen (because the user wrote it from\n// the dashboard), treat it as the new starting point and reset stateSince.\nlet stateSince = persisted.stateSince || now;\nif (persisted.lastState !== stateFromHA) {\n    stateSince = now;\n}\n\n// Refuse auto-arm if any required sensor reads 'unavailable' or 'unknown'.\n// Otherwise the FSM would treat a missing door reading as \"door closed\"\n// and arm with a blind sensor. Caught one of these in the wild.\nconst requiredSensors = [\n    'binary_sensor.battery_room_door_contact',\n    'binary_sensor.battery_room_motion_main_occupancy',\n    'binary_sensor.battery_room_motion_aux_occupancy',\n];\nconst sensorsAvailable = requiredSensors.every((id) => {\n    const s = ha[id]?.state;\n    return s && s !== 'unavailable' && s !== 'unknown';\n});\n\nconst ctx = {\n    now,\n    state: stateFromHA,\n    stateSince,\n    doorOpen:           isOn('binary_sensor.battery_room_door_contact'),\n    motionMain:         isOn('binary_sensor.battery_room_motion_main_occupancy'),\n    motionAux:          isOn('binary_sensor.battery_room_motion_aux_occupancy'),\n    sensorsAvailable,\n    autoArmEnabled:     isOn('input_boolean.alarm_auto_arm_enabled'),\n    armingQuietMinutes: num('input_number.alarm_arming_quiet_minutes', 5),\n    armingGraceSeconds: num('input_number.alarm_arming_grace_seconds', 10),\n    sirenDurationS:     num('input_number.alarm_siren_duration_s', 60),\n    triggerReason:      ha['input_text.alarm_trigger_reason']?.state || '',\n};\n\nconst result = stepAlarm(ctx);\nflow.set('alarm_state_meta', { lastState: result.state, stateSince: result.stateSince });\n\n// Decide what to push downstream.\nconst stateChanged = result.state !== stateFromHA;\nconst nowTriggered = stateChanged && result.state === 'triggered';\nconst leftTriggered = stateChanged && stateFromHA === 'triggered';\nconst sirenWasOn = flow.get('alarm_siren_on') === true;\nconst sirenStateChanged = result.sirenOn !== sirenWasOn;\nflow.set('alarm_siren_on', result.sirenOn);\n\nnode.status({\n    fill: result.state === 'triggered' ? 'red'\n        : result.state === 'armed' ? 'green'\n        : result.state === 'arming' ? 'yellow'\n        : 'grey',\n    shape: 'dot',\n    text: `${result.state} | door=${ctx.doorOpen?'open':'closed'} m1=${ctx.motionMain?'1':'0'} m2=${ctx.motionAux?'1':'0'} siren=${result.sirenOn?'on':'off'}`\n});\n\nconst out = [null, null, null, null, null];\nif (stateChanged) {\n    out[0] = { topic: 'state', payload: result.state };\n    out[1] = { topic: 'reason', payload: result.triggerReason };\n}\nif (sirenStateChanged) {\n    out[2] = result.sirenOn\n        ? { payload: 'on',  duration: Math.round(ctx.sirenDurationS) }\n        : { payload: 'off' };\n}\nif (nowTriggered) {\n    out[3] = { payload: { reason: result.triggerReason } };\n}\n\n// Sensor-status writeback: persist a human-readable string when any\n// required sensor is unavailable, clear it when they all come back.\n// Emits only on transition so the recorder doesn't see 1 Hz writes.\nconst sensorStatusText = sensorsAvailable\n    ? ''\n    : 'czujnik niedost\u0119pny: ' + requiredSensors\n        .filter((id) => {\n            const s = ha[id]?.state;\n            return !s || s === 'unavailable' || s === 'unknown';\n        })\n        .join(', ');\nconst prevSensorStatus = flow.get('alarm_sensor_status_text') || '';\nif (sensorStatusText !== prevSensorStatus) {\n    flow.set('alarm_sensor_status_text', sensorStatusText);\n    out[4] = { topic: 'sensor_status', payload: sensorStatusText };\n}\n\nreturn out;\n",
         "outputs": 5,
         "x": 430,
         "y": 200,
@@ -304,7 +304,7 @@
         "name": "push: critical alarm (group)",
         "server": "",
         "version": 7,
-        "data": "{\n  \"message\": \"Wyzwolony przez: \" & $join($map($split(payload.reason, \" \u00b7 \"), function($k){ $lookup({\"door\": \"otwarcie drzwi\",\"motion_main\": \"ruch (g\u0142\u00f3wny)\",\"motion_aux\": \"ruch (pomocniczy)\",\"tamper\": \"manipulacja czujnikiem\"}, $k) ? $lookup({\"door\": \"otwarcie drzwi\",\"motion_main\": \"ruch (g\u0142\u00f3wny)\",\"motion_aux\": \"ruch (pomocniczy)\",\"tamper\": \"manipulacja czujnikiem\"}, $k) : $k}), \" \u00b7 \"), \"motion_aux\", \"ruch (pomocniczy)\"), \"door\", \"otwarcie drzwi\"),\n  \"title\": \"\\uD83D\\uDEA8 Alarm pomieszczenia akumulator\u00f3w\",\n  \"data\": {\n    \"push\": { \"sound\": { \"critical\": 1, \"name\": \"default\", \"volume\": 1.0 }, \"interruption-level\": \"critical\" },\n    \"channel\": \"alarm\",\n    \"importance\": \"high\",\n    \"ttl\": 0,\n    \"priority\": \"high\",\n    \"actions\": [\n      { \"action\": \"URI\", \"title\": \"Otw\u00f3rz panel\", \"uri\": \"/local/alarm.html\" }\n    ]\n  }\n}",
+        "data": "{\n  \"message\": \"Wyzwolony przez: \" & $join($map($split(payload.reason, \" \u00b7 \"), function($k){ $lookup({\"door\": \"otwarcie drzwi\",\"motion_main\": \"ruch (g\u0142\u00f3wny)\",\"motion_aux\": \"ruch (pomocniczy)\"}, $k) ? $lookup({\"door\": \"otwarcie drzwi\",\"motion_main\": \"ruch (g\u0142\u00f3wny)\",\"motion_aux\": \"ruch (pomocniczy)\"}, $k) : $k}), \" \u00b7 \"), \"motion_aux\", \"ruch (pomocniczy)\"), \"door\", \"otwarcie drzwi\"),\n  \"title\": \"\\uD83D\\uDEA8 Alarm pomieszczenia akumulator\u00f3w\",\n  \"data\": {\n    \"push\": { \"sound\": { \"critical\": 1, \"name\": \"default\", \"volume\": 1.0 }, \"interruption-level\": \"critical\" },\n    \"channel\": \"alarm\",\n    \"importance\": \"high\",\n    \"ttl\": 0,\n    \"priority\": \"high\",\n    \"actions\": [\n      { \"action\": \"URI\", \"title\": \"Otw\u00f3rz panel\", \"uri\": \"/local/alarm.html\" }\n    ]\n  }\n}",
         "dataType": "jsonata",
         "domain": "notify",
         "service": "alarm_recipients",
@@ -383,98 +383,6 @@
             []
         ],
         "action": "siren.turn_off"
-    },
-    {
-        "id": "trg_tamper_door",
-        "type": "server-state-changed",
-        "z": "tab_battery_room_alarm",
-        "name": "door tamper",
-        "server": "",
-        "version": 6,
-        "outputs": 1,
-        "exposeAsEntityConfig": "",
-        "outputInitially": false,
-        "outputOnlyOnStateChange": true,
-        "outputProperties": [
-            {
-                "property": "topic",
-                "propertyType": "msg",
-                "value": "trg_tamper_door",
-                "valueType": "str"
-            }
-        ],
-        "x": 140,
-        "y": 240,
-        "wires": [
-            [
-                "fsm"
-            ]
-        ],
-        "entities": {
-            "entity": [
-                "binary_sensor.battery_room_door_tamper"
-            ],
-            "substring": [],
-            "regex": []
-        },
-        "stateType": "str",
-        "ifState": "",
-        "ifStateType": "str",
-        "ifStateOperator": "is",
-        "for": "0",
-        "forType": "num",
-        "forUnits": "minutes",
-        "ignorePrevStateNull": false,
-        "ignorePrevStateUnknown": false,
-        "ignorePrevStateUnavailable": false,
-        "ignoreCurrentStateUnknown": false,
-        "ignoreCurrentStateUnavailable": false
-    },
-    {
-        "id": "trg_tamper_motion_aux",
-        "type": "server-state-changed",
-        "z": "tab_battery_room_alarm",
-        "name": "motion-aux tamper",
-        "server": "",
-        "version": 6,
-        "outputs": 1,
-        "exposeAsEntityConfig": "",
-        "outputInitially": false,
-        "outputOnlyOnStateChange": true,
-        "outputProperties": [
-            {
-                "property": "topic",
-                "propertyType": "msg",
-                "value": "trg_tamper_motion_aux",
-                "valueType": "str"
-            }
-        ],
-        "x": 140,
-        "y": 290,
-        "wires": [
-            [
-                "fsm"
-            ]
-        ],
-        "entities": {
-            "entity": [
-                "binary_sensor.battery_room_motion_aux_tamper"
-            ],
-            "substring": [],
-            "regex": []
-        },
-        "stateType": "str",
-        "ifState": "",
-        "ifStateType": "str",
-        "ifStateOperator": "is",
-        "for": "0",
-        "forType": "num",
-        "forUnits": "minutes",
-        "ignorePrevStateNull": false,
-        "ignorePrevStateUnknown": false,
-        "ignorePrevStateUnavailable": false,
-        "ignoreCurrentStateUnknown": false,
-        "ignoreCurrentStateUnavailable": false
     },
     {
         "type": "api-call-service",
