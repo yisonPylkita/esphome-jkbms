@@ -488,9 +488,10 @@ function humanDuration(s) {
 let historyHours = parseInt(localStorage.getItem('bms-hist-h') || '24', 10);
 let historyCache = null; // { fetchedAt, hours, byEntity }
 let historyInflight = null;
+let historyAbort = null; // AbortController for the in-flight fetch, if any
 let historyLastError = null;
 
-async function fetchHistory(hours) {
+async function fetchHistory(hours, signal) {
   if (isDemo) return demoHistory(hours);
   const end = new Date();
   const start = new Date(end.getTime() - hours * 3600 * 1000);
@@ -509,7 +510,10 @@ async function fetchHistory(hours) {
     `&significant_changes_only` +
     `&no_attributes` +
     `&end_time=${end.toISOString()}`;
-  const arr = await _haFetch(path);
+  // Pass the abort signal through to `_haFetch` so range-tab clicks can
+  // cancel an in-flight history fetch without leaving the dashboard in a
+  // half-loaded state.
+  const arr = await _haFetch(path, { signal });
   // arr is parallel to filter_entity_id order; sometimes HA returns subset if entity has no data.
   const byEntity = {};
   for (const series of arr) {
@@ -554,6 +558,13 @@ function demoHistory(hours) {
 // <script src> tag higher up the body and inlined into the deployed
 // HTML by scripts/minify-html.py.
 
+// Forward-fill stops after this many ms of silence so a dead sensor
+// reads as a chart gap rather than a flat line stretching to "now".
+// Absolute-time TTL means the same rule applies regardless of the
+// current range (1h vs 7d) — both have wildly different bucket widths
+// but the same notion of "sensor went quiet".
+const FORWARD_FILL_TTL_MS = 10 * 60 * 1000;
+
 function bucketize(samples, nBuckets, startMs, endMs) {
   const buckets = Array.from({ length: nBuckets }, (_, i) => ({
     t: startMs + ((i + 0.5) * (endMs - startMs)) / nBuckets,
@@ -572,15 +583,20 @@ function bucketize(samples, nBuckets, startMs, endMs) {
     b.sum += s.v;
     b.count++;
   }
-  // Forward-fill ONLY after the first real sample. Buckets before
-  // the first datum stay null so the chart doesn't draw a line where
-  // history doesn't exist (e.g. select 7d window when device is 1h old).
+  // Forward-fill ONLY after the first real sample, AND only for up to
+  // FORWARD_FILL_TTL_MS of consecutive empty buckets. Past the TTL we
+  // emit null so the renderer draws a gap — a dead sensor should not
+  // masquerade as a flat-lined live reading. Buckets before the first
+  // datum stay null so the chart doesn't draw a line where history
+  // doesn't exist (e.g. select 7d window when device is 1h old).
   let carry = NaN;
+  let carryEndMs = -Infinity;
   for (const b of buckets) {
     if (b.count > 0) {
       b.avg = b.sum / b.count;
       carry = b.avg;
-    } else if (!isNaN(carry)) {
+      carryEndMs = b.t + FORWARD_FILL_TTL_MS;
+    } else if (!isNaN(carry) && b.t <= carryEndMs) {
       b.avg = carry;
       b.min = carry;
       b.max = carry;
@@ -803,26 +819,76 @@ function drawChart(canvas, buckets, opts = {}) {
     } else ctx.lineTo(x, y);
   });
   ctx.stroke();
+
+  // Axis labels in the canvas corners — keeps the chart self-describing
+  // without an HTML overlay. Top-left = yMax, bottom-left = yMin (just
+  // inside the data padding), bottom-left/right (further from the y
+  // labels) = window start / end timestamps. On very narrow canvases
+  // (≤ 200 px) we skip the time labels to avoid overlap with the
+  // y-labels — y-labels are the more critical of the two.
+  ctx.save();
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  const fy = opts.formatY || ((v) => v.toFixed(1));
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  ctx.fillText(fy(yMax), 2, 1);
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(fy(yMin), 2, cssH - 1);
+  if (cssW > 200 && opts.startMs && opts.endMs) {
+    const ft = opts.formatT || defaultFormatT;
+    const spanMs = opts.endMs - opts.startMs;
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'left';
+    ctx.fillText(ft(opts.startMs, spanMs), 38, cssH - 1);
+    ctx.textAlign = 'right';
+    ctx.fillText(ft(opts.endMs, spanMs), cssW - 2, cssH - 1);
+  }
+  ctx.restore();
 }
 
-async function refreshHistoryIfStale() {
+// HH:MM for short windows (≤ 24h), Mon-DD HH:MM otherwise. Local time
+// because the user is reading "today around lunch" not UTC instants.
+function defaultFormatT(ms, spanMs) {
+  const d = new Date(ms);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  if (spanMs <= 24 * 3600 * 1000) return hm;
+  const mons = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${mons[d.getMonth()]}-${pad2(d.getDate())} ${hm}`;
+}
+
+async function refreshHistoryIfStale({ force = false } = {}) {
   const now = Date.now();
   if (
+    !force &&
     historyCache &&
     historyCache.hours === historyHours &&
     now - historyCache.fetchedAt < HISTORY_REFRESH_MS
   )
     return;
-  if (historyInflight) return historyInflight;
+  // Cancel-and-replace: if a previous fetch is still in flight (because
+  // the user just clicked a range tab, or the 1 Hz tick raced with a
+  // slow recorder query), abort it so its eventual completion can't
+  // overwrite the newer fetch's data — that produced visible flicker
+  // when range buttons were clicked rapidly.
+  if (historyAbort) historyAbort.abort();
+  const ctrl = new AbortController();
+  historyAbort = ctrl;
+  const targetHours = historyHours;
   historyInflight = (async () => {
     try {
-      const byEntity = await fetchHistory(historyHours);
-      historyCache = { fetchedAt: Date.now(), hours: historyHours, byEntity };
+      const byEntity = await fetchHistory(targetHours, ctrl.signal);
+      historyCache = { fetchedAt: Date.now(), hours: targetHours, byEntity };
       historyLastError = null;
     } catch (e) {
+      if (e.name === 'AbortError') return; // user clicked a different range
       historyLastError = e.message || String(e);
     } finally {
-      historyInflight = null;
+      if (historyAbort === ctrl) {
+        historyAbort = null;
+        historyInflight = null;
+      }
     }
   })();
   return historyInflight;
@@ -834,6 +900,13 @@ function renderHistory() {
     meta.textContent = historyLastError
       ? `history error: ${historyLastError}`
       : 'fetching history…';
+    // Clear the per-chart "current value" readouts so a stale value
+    // from the previous range doesn't sit there pretending to be live
+    // data for the new (not yet loaded) range.
+    for (const id of ['chart-soc-cur', 'chart-current-cur', 'chart-power-cur', 'chart-temp-cur']) {
+      const el = $(id);
+      if (el) el.textContent = '—';
+    }
     return;
   }
   const { byEntity, fetchedAt, hours } = historyCache;
@@ -862,6 +935,7 @@ function renderHistory() {
     lineColor: '#4ade80',
     fixedMin: 0,
     fixedMax: 100,
+    formatY: (v) => `${Math.round(v)}%`,
   });
   drawChart($('chart-current'), curB, {
     ...baseOpts,
@@ -869,6 +943,7 @@ function renderHistory() {
     bandColor: 'rgba(251, 191, 36, 0.18)',
     lineColor: '#fbbf24',
     zeroLine: true,
+    formatY: (v) => `${v.toFixed(Math.abs(v) >= 10 ? 0 : 1)}A`,
   });
   drawChart($('chart-power'), pwrB, {
     ...baseOpts,
@@ -876,28 +951,38 @@ function renderHistory() {
     bandColor: 'rgba(251, 191, 36, 0.18)',
     lineColor: '#fbbf24',
     zeroLine: true,
+    formatY: (v) => `${Math.round(v)}W`,
   });
   drawChart($('chart-temp'), tempB, {
     ...baseOpts,
     band: true,
     bandColor: 'rgba(96, 165, 250, 0.18)',
     lineColor: '#60a5fa',
+    formatY: (v) => `${v.toFixed(0)}°C`,
   });
 
   const last = (arr) => (arr.length ? arr[arr.length - 1] : null);
-  const fmt = (n, dec = 1) => (isFinite(n) ? n.toFixed(dec) : '--');
+  // Show an em-dash ("—") whenever the source value is unavailable or
+  // NaN. Previously these readouts would either keep their last good
+  // value (if the element wasn't re-written) or print "NaN unit" — both
+  // misleading for a diagnostic view. Treating null / NaN / no-sample
+  // uniformly as "—" makes "sensor went dark" unambiguous.
+  const curOr = (point, dec, unit) => {
+    const v = point && Number.isFinite(point.v) ? point.v : NaN;
+    return isFinite(v) ? `${v.toFixed(dec)} ${unit}` : '—';
+  };
   const lastSoc = last(byEntity['sensor.jk_pb_bms_state_of_charge'] ?? []);
   const lastCur = last(byEntity['sensor.jk_pb_bms_current'] ?? []);
   const lastPwr = last(byEntity['sensor.jk_pb_bms_power'] ?? []);
   // Live max temperature across all 6 sensors
   const lastTemps = TEMP_HISTORY_ENTITIES.map((eid) => last(byEntity[eid] ?? []))
-    .filter(Boolean)
+    .filter((p) => p && Number.isFinite(p.v))
     .map((p) => p.v);
   const lastTmax = lastTemps.length ? Math.max(...lastTemps) : NaN;
-  $('chart-soc-cur').textContent = lastSoc ? `${fmt(lastSoc.v, 0)} %` : '--';
-  $('chart-current-cur').textContent = lastCur ? `${fmt(lastCur.v, 2)} A` : '--';
-  $('chart-power-cur').textContent = lastPwr ? `${fmt(lastPwr.v, 0)} W` : '--';
-  $('chart-temp-cur').textContent = isFinite(lastTmax) ? `${fmt(lastTmax, 1)} °C` : '--';
+  $('chart-soc-cur').textContent = curOr(lastSoc, 0, '%');
+  $('chart-current-cur').textContent = curOr(lastCur, 2, 'A');
+  $('chart-power-cur').textContent = curOr(lastPwr, 0, 'W');
+  $('chart-temp-cur').textContent = isFinite(lastTmax) ? `${lastTmax.toFixed(1)} °C` : '—';
 
   const ago = Math.round((Date.now() - fetchedAt) / 1000);
   const totalPoints = Object.values(byEntity).reduce((s, a) => s + a.length, 0);
@@ -915,7 +1000,10 @@ document.querySelectorAll('#range-buttons button').forEach((btn) => {
       .querySelectorAll('#range-buttons button')
       .forEach((b) => b.classList.toggle('active', parseInt(b.dataset.h, 10) === h));
     historyCache = null;
-    refreshHistoryIfStale().then(renderHistory);
+    // force: true so we abort any in-flight fetch and start a fresh one
+    // for the new range — even if the previous request was only a
+    // moment old, the user clicked, the user gets the new window.
+    refreshHistoryIfStale({ force: true }).then(renderHistory);
   });
 });
 // Set initial active button
