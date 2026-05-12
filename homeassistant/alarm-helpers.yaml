@@ -284,27 +284,42 @@ automation:
                   value: >-
                     siren_on:{{ states('input_number.alarm_siren_duration_s') | int(60) }};push:{{ states('input_text.alarm_trigger_reason') }}
         default:
-          # Production siren: the Aqara JY-GZ-01AQ exposes itself as an HA
-          # `siren` entity with `assumed_state: true` — the device has no
-          # state-readback channel. Two gotchas from the live debug:
-          #   - The `tone` parameter is REQUIRED. Calling siren.turn_on
-          #     without a tone makes HA flip the assumed state to `on`
-          #     but the device never actually plays anything.
-          #   - The volume must be set on `select.battery_room_siren_volume`
-          #     before turn_on, otherwise the device uses its (typically
-          #     mute) default. We force it to `high` every time, which
-          #     is idempotent.
+          # Production siren: Tuya TS0224 (`_TZ3000_cipibmnp`) over
+          # Zigbee/Z2M. The HA `siren` entity has `assumed_state: true`
+          # — there is no state readback. Two notes from the live debug
+          # session, both load-bearing:
+          #
+          #   - `tone` is required. Without it, HA's siren.turn_on call
+          #     flips the assumed state to `on` but the Z2M converter
+          #     produces an `ssIasWd.startWarning` with mode=0 (silent),
+          #     which the device honours by not making noise.
+          #   - We must force `select.battery_room_siren_volume` to
+          #     `high` before each turn_on. The device defaults to
+          #     low/mute when re-paired or repowered.
+          #
+          # Zigbee downlink reliability to this device is marginal
+          # (linkquality ~108 — borderline). Individual `startWarning`
+          # commands are dropped by the radio retry layer at a high
+          # rate. Compensate by firing the command 3 times across ~3 s;
+          # the device ignores subsequent commands while a warning is
+          # already playing, so the worst case is one extra noisy
+          # second.
           - service: select.select_option
             target:
               entity_id: select.battery_room_siren_volume
             data:
               option: "high"
-          - service: siren.turn_on
-            target:
-              entity_id: siren.battery_room_siren
-            data:
-              tone: "burglar"
-              duration: "{{ states('input_number.alarm_siren_duration_s') | int(60) }}"
+          - repeat:
+              count: 3
+              sequence:
+                - service: siren.turn_on
+                  target:
+                    entity_id: siren.battery_room_siren
+                  data:
+                    tone: "burglar"
+                    duration: "{{ states('input_number.alarm_siren_duration_s') | int(60) }}"
+                - delay:
+                    seconds: 1
           - service: notify.alarm_recipients
             data:
               title: "🚨 Alarm pomieszczenia akumulatorów"
@@ -374,9 +389,18 @@ automation:
                 data:
                   value: "siren_off"
         default:
-          - service: siren.turn_off
-            target:
-              entity_id: siren.battery_room_siren
+          # Same retry hedge as the intrusion turn_on — Zigbee
+          # downlink is unreliable. If the user hits DISARM and the
+          # off command drops, the siren would keep wailing for the
+          # remaining `duration` seconds. 3 attempts × 1 s gap.
+          - repeat:
+              count: 3
+              sequence:
+                - service: siren.turn_off
+                  target:
+                    entity_id: siren.battery_room_siren
+                - delay:
+                    seconds: 1
 
   # ---- Mobile-app notification action callbacks. ----
   - alias: "jk_alarm: handle notification action"
@@ -403,9 +427,14 @@ automation:
           - conditions:
               - "{{ trigger.event.data.action == 'SILENCE_BATTERY_ROOM' }}"
             sequence:
-              - service: siren.turn_off
-                target:
-                  entity_id: siren.battery_room_siren
+              - repeat:
+                  count: 3
+                  sequence:
+                    - service: siren.turn_off
+                      target:
+                        entity_id: siren.battery_room_siren
+                    - delay:
+                        seconds: 1
 
   # ---- Low-battery alert — independent of the alarm state machine. ----
   - alias: alarm_sensor_battery_low
