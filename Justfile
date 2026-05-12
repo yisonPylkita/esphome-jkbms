@@ -34,6 +34,14 @@ test:
 test-alarm:
     scripts/test-alarm-ha.sh
 
+# Zigbee downlink reliability test for the battery-room siren. Runs on
+# the HA box itself; pushes the script then exits. Default: 30 pings,
+# 5s apart (~2.5 min). Healthy: ≥ 95% success. 0% means the device
+# dropped off the mesh — power-cycle, re-pair, possibly add a router.
+ping-siren n="30" gap="5":
+    scp -O -q -o ConnectTimeout=10 scripts/ping-siren.py root@$(grep -E '^ha_host:' secrets.yaml | sed -E 's/^ha_host: *"?([^"]*)"? *$/\1/'):/tmp/ping-siren.py
+    ssh -o ConnectTimeout=10 root@$(grep -E '^ha_host:' secrets.yaml | sed -E 's/^ha_host: *"?([^"]*)"? *$/\1/') "python3 /tmp/ping-siren.py {{n}} {{gap}}"
+
 # What CI runs: format-check + every gate + tests, in order.
 ci: fmt-check check test
 
