@@ -21,4 +21,8 @@ node_modules/
 
 # Dashboard with embedded HA token — local-only, never commit.
 dashboard/*.local.html
-.claude/
+# Ignore everything under .claude/ (worktrees, caches, local config) EXCEPT
+# the agents/ subdir, which holds tracked subagent definitions consumed
+# by Claude Code (see AGENTS.md → "Subagent index").
+.claude/*
+!.claude/agents/
