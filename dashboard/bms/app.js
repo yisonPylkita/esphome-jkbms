@@ -385,14 +385,19 @@ async function tick() {
     // mean is more representative than max for a steady-state readout.
     const tAvg = tVals.length ? tVals.reduce((s, v) => s + v, 0) / tVals.length : NaN;
 
-    // Staleness: triggers the NO-LINK overlay if EITHER the BMS link
-    // is reported down OR voltage hasn't been pushed in > 5 s. We use
-    // voltage's last_updated because total_voltage jitters on every BMS
-    // notification while idle power can dedupe to a flat 0 W and never
-    // refresh its own last_updated.
-    const STALE_GRACE_MS = 5000;
-    const voltAgeMs = Date.now() - new Date(v.last_updated).getTime();
-    const stale = !online || isNaN(soc) || voltAgeMs > STALE_GRACE_MS;
+    // Staleness: triggers the NO-LINK overlay when the BMS link is
+    // reported down (binary_sensor.jk_pb_bms_online_status flips to
+    // `off`, or HA's ESPHome integration marks every BMS entity
+    // `unavailable` when the API socket dies) or when SOC is unreadable.
+    //
+    // Note: we deliberately do NOT compare entity `last_updated`
+    // timestamps against now. The ESPHome firmware throttles every
+    // high-cardinality sensor at source (1 mV delta on voltages, etc.),
+    // so a healthy BMS on a stable plateau emits no events for minutes
+    // at a time. HA's `last_updated` doesn't bump in that window — but
+    // the device IS alive. The catch block at the bottom already covers
+    // "HA itself unreachable", which is the other failure mode.
+    const stale = !online || isNaN(soc);
     $('stale').classList.toggle('visible', stale);
 
     if (!isNaN(soc)) {
