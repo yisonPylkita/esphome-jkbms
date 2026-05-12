@@ -34,11 +34,14 @@ intrusion alarm expressed entirely as Home Assistant automations.
   the alarm dashboard via the `historia ›` link. Deploys to
   `/local/alarm-history.html`.
 - **`homeassistant/alarm-helpers.yaml`** — the entire alarm system as a
-  single HA package: helpers (input_boolean / input_number / input_select /
-  input_text), the FSM expressed as automations (`disarmed → arming →
-armed → triggered`) driven by Zigbee motion + door sensors, and the
-  side-effects (Zigbee siren + critical-priority push on trip). Deploys
-  to `/config/packages/jk_alarm.yaml`. Integration-tested by
+  single HA package, built around the idiomatic
+  `alarm_control_panel.manual` platform: helpers (policy knobs +
+  test-mode toggle), the panel itself (`alarm_control_panel.battery_room`),
+  two `template:` derived sensors (`binary_sensor.alarm_sensors_ok` +
+  `sensor.alarm_sensors_missing`), and a small set of automations
+  (auto-arm policy, sensor → panel trigger bridge, side-effects, push
+  notification action callbacks). Deploys to
+  `/config/packages/jk_alarm.yaml`. Integration-tested by
   `scripts/test-alarm-ha.sh` — see "Testing the alarm" below.
 - **`scripts/deploy-ha.sh`** — one-shot deploy / re-deploy to a Home
   Assistant box (substitutes the API token, mirrors fonts, idempotently
@@ -195,32 +198,53 @@ the history view.
 ### 6. Alarm — pure Home Assistant package
 
 The whole alarm system lives in `homeassistant/alarm-helpers.yaml`,
-deployed by `just deploy` to `/config/packages/jk_alarm.yaml`. Helpers,
-FSM transitions, and side-effect automations are co-located in that one
-file so the alarm is a single auditable unit.
+deployed by `just deploy` to `/config/packages/jk_alarm.yaml`. The
+canonical state holder is `alarm_control_panel.battery_room` — HA's
+first-class alarm entity, which means the iOS / Android mobile apps
+render it natively (lock-screen alarm widget, alarm-domain
+notifications, native arm / disarm tiles). Note: edits to the
+`alarm_control_panel:` block require `ha core restart` (not just
+`automation.reload`) — that part of HA's config doesn't have a
+runtime-reload path.
 
-State machine (`input_select.alarm_state`):
+State machine — what each panel state means here:
 
 ```
-disarmed ─[auto-arm conditions hold]→ arming
-arming   ─[same conditions hold for `quiet_minutes`]→ armed
-armed    ─[any sensor opens after `grace_seconds`]→ triggered
-*        ─[user clicks DISARM in dashboard]→ disarmed
+disarmed   ─[auto-arm: conditions hold for `quiet_minutes`]→ armed_away
+disarmed   ─[user clicks ARM]→                                armed_away
+armed_away ─[any wired sensor opens]→                         pending
+pending    ─[no disarm during `delay_time` (10 s)]→           triggered
+*          ─[user clicks DISARM]→                             disarmed
 ```
 
-The dashboard's ARM / DISARM buttons write directly to the input_select;
-the automations watch sensor state changes (template triggers with
-`for:` enforce continuous quiet) and drive the transitions.
+The auto-arm policy is one automation (template trigger with `for:`
+over the quiet-window); the sensor → panel bridge is another
+automation (state trigger calling `alarm_control_panel.alarm_trigger`).
+The dashboard's ARM / DISARM buttons call the standard panel services
+directly.
+
+Sensor health is declarative: `binary_sensor.alarm_sensors_ok` is a
+`template:` sensor that's `on` iff every wired sensor reports a real
+state (not unavailable / unknown). `sensor.alarm_sensors_missing`
+emits the Polish label list for the dashboard banner. The auto-arm
+automation gates on `alarm_sensors_ok` — refusing to arm with a blind
+sensor — but manual arm via the panel service ignores it.
+
+Push notifications include actionable lock-screen buttons (DISARM,
+SILENCE) wired via `mobile_app_notification_action` events.
+`authentication_required: true` on the destructive button forces a
+Face ID / passcode unlock before the disarm fires.
 
 ### Testing the alarm
 
 `scripts/test-alarm-ha.sh` (or `just test-alarm`) drives the live HA
-instance via REST: pokes sensor states, waits for the right
-automation to fire, asserts the resulting `input_select.alarm_state`.
-Every behaviour the FSM has to honour (auto-arm path, disturbance
-mid-arming, grace suppression, trigger-reason aggregation, latched-
-triggered, sensor-availability gating, manual disarm side-effects) is
-one or more assertions here — this script is the spec.
+instance via REST: pokes sensor states, calls
+`alarm_control_panel.alarm_arm_away` / `alarm_disarm`, asserts the
+resulting panel state. Every behaviour the alarm must honour (auto-arm
+path, disturbance mid-arming, entry-delay grace, trigger-reason
+aggregation, latched-triggered, sensor-availability gating, manual
+disarm side-effects) is one or more assertions here — this script
+is the spec.
 
 Destructive side-effects are stubbed by flipping
 `input_boolean.alarm_test_mode` on — the siren and push automations
@@ -356,14 +380,15 @@ is enough).
 
 ### Sensor health: unavailable + low battery
 
-The FSM treats sensor problems as part of the alarm posture:
+Two layers, both declarative:
 
-- **Unavailable sensor.** If any of `door_contact` / `motion_main` /
-  `motion_aux` reads `unavailable` or `unknown` (radio dropout, dead
-  battery), the FSM **refuses to auto-arm** and writes a description
-  to `input_text.alarm_sensor_status`. The alarm dashboard surfaces
-  this as an amber banner under the connection-status overlay.
-  Once the sensor recovers the banner clears automatically.
+- **Unavailable sensor.** `binary_sensor.alarm_sensors_ok` is a
+  `template:` sensor that's `on` iff every wired sensor reports a
+  real state (not `unavailable` / `unknown`). The auto-arm automation
+  gates on it — refusing to arm with a blind sensor.
+  `sensor.alarm_sensors_missing` exposes the Polish label list; the
+  alarm dashboard reads both and shows the amber banner. Once a
+  sensor recovers, both clear automatically.
 - **Low battery.** A separate HA automation in `alarm-helpers.yaml`
   watches the per-device `*_battery_low` binary sensors with a 5-min
   debounce and pushes to `notify.alarm_recipients` when one trips.
@@ -377,7 +402,7 @@ added. To resolve: open `dashboard/history/app.js`, add the user's full
 UUID → friendly-label mapping to `USER_MAP`, then re-deploy. Find the
 UUID via HA → Settings → People → Users → click user → the URL
 contains it. The legacy `Node-RED` entry is retained so events recorded
-before the FSM was ported to native HA still render with a readable
+before the alarm was ported to native HA still render with a readable
 label.
 
 ## `just` recipes
@@ -388,7 +413,7 @@ Run `just` with no arguments to print the recipe list. Highlights:
 - `just fmt` — format every supported file (prettier + ruff).
 - `just check` — every validation gate (formatter, JSON, esphome
   config, HTML parse, link integrity, minifier round-trip, secrets scan).
-- `just test-alarm` — drive the live HA alarm through every FSM
+- `just test-alarm` — drive the live HA alarm through every panel
   transition via REST. Side-effects routed to a log entity so it's
   safe to run while the real alarm is in service.
 - `just test` — Node-driven unit tests against `dashboard/lib/*.js`.

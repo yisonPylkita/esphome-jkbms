@@ -1,45 +1,52 @@
-# Battery-room alarm — pure Home Assistant package.
+# Battery-room alarm — pure Home Assistant package, idiomatic build.
 #
-# This file is the complete alarm system: helpers (state, knobs), the FSM
-# expressed as HA automations, and the side-effect actions (siren, push).
-# `input_select.alarm_state` is the single source of truth; the dashboard's
-# ARM/DISARM buttons write to it directly and the automations below
-# react to its value.
+# Built around the `alarm_control_panel.manual` platform — the canonical
+# HA alarm entity, so the iOS / Android mobile apps render it natively
+# (lock-screen alarm widget, alarm-domain notifications, native arm /
+# disarm tiles).
 #
 # Deployed by `scripts/deploy-ha.sh` as `/config/packages/jk_alarm.yaml`.
 # HA merges each file in `/config/packages/` per-domain via the
 # `homeassistant.packages: !include_dir_named packages` directive.
 #
-# State model:
-#   disarmed  ─[auto-arm conditions met instantaneously]→  arming
-#   arming    ─[same conditions hold for `quiet_minutes`]→ armed
-#   arming    ─[disturbance during the wait]→             arming (timer
-#                                                              implicitly
-#                                                              resets via
-#                                                              template
-#                                                              trigger's
-#                                                              `for:`)
-#   armed     ─[any sensor opens after `grace_seconds`]→   triggered
-#   *         ─[user clicks DISARM in dashboard]→          disarmed
+# Note: editing the `alarm_control_panel:` block below requires
+# `ha core restart` to pick up — that part of HA's config is not in the
+# YAML-reload path. Edits to automations / helpers / templates DO
+# reload via `automation.reload` / `homeassistant.reload_core_config`.
+#
+# State model — what each panel state means here:
+#
+#   disarmed     idle, dashboard may show "UZBRAJANIE za Xs" if the
+#                auto-arm conditions are converging.
+#   armed_away   armed; sensors are watched.
+#   pending      a sensor went on while armed_away — entry-delay
+#                countdown before the panel transitions to triggered.
+#                Dashboard surfaces this as "ALARM za Xs" to give the
+#                user a chance to disarm.
+#   triggered    siren fires (auto-quiets after siren_duration_s but
+#                state latches — `trigger_time: 0` disables auto-
+#                disarm); push goes out; stays here until manual
+#                disarm.
+#
+# Auto-arm policy lives in an automation, not in the panel: the panel
+# arms instantly when called; the automation only calls it once the
+# quiet-hold window elapses (see `jk_alarm: auto-arm` below).
 #
 # Testability:
-#   `input_boolean.alarm_test_mode` routes the destructive side-effects
-#   (siren on/off, push notification) to `input_text.alarm_test_log`
-#   instead of firing the real services. `scripts/test-alarm-ha.sh`
-#   drives every transition via the REST API and asserts the resulting
-#   state without touching real hardware. When test_mode is on, the
-#   timing-sensitive transitions use `*_test_seconds` overrides so a
-#   full FSM walk runs in ~10 s instead of the production ~5 min.
+#   `input_boolean.alarm_test_mode` routes destructive side-effects
+#   (siren on/off, push notification) to `input_text.alarm_test_log`.
+#   `scripts/test-alarm-ha.sh` drives every transition through the
+#   alarm_control_panel REST API without paging anyone.
 
+# ---- Helpers ----
 input_boolean:
   alarm_auto_arm_enabled:
     name: Alarm auto-arm enabled
     icon: mdi:shield-sync
     initial: true
-  # Test mode — when on, siren/push side-effects write to the test log
-  # entity instead of firing. Lets us exercise every FSM transition
-  # against the live HA without yanking on real sirens or paging
-  # everyone's phone.
+  # When on, the siren / push automations log to alarm_test_log
+  # instead of calling real services. Used by the integration test
+  # and any time you want to step through transitions safely.
   alarm_test_mode:
     name: Alarm test mode
     icon: mdi:flask
@@ -62,17 +69,8 @@ input_number:
     unit_of_measurement: "s"
     icon: mdi:bullhorn
     initial: 60
-  alarm_arming_grace_seconds:
-    name: Alarm arming grace seconds
-    min: 0
-    max: 60
-    step: 1
-    unit_of_measurement: "s"
-    icon: mdi:run-fast
-    initial: 10
-  # Test-mode overrides. Production `for:` durations are minutes-long
-  # which makes integration tests painfully slow. When test_mode is
-  # on, the FSM templates pick these short values instead.
+  # Test-mode override for the quiet-hold window. Production
+  # alarm_arming_quiet_minutes is minutes-long; tests use seconds.
   alarm_test_quiet_seconds:
     name: Alarm test quiet seconds
     min: 1
@@ -81,53 +79,93 @@ input_number:
     unit_of_measurement: "s"
     icon: mdi:flask-empty
     initial: 3
-  alarm_test_grace_seconds:
-    name: Alarm test grace seconds
-    min: 0
-    max: 10
-    step: 1
-    unit_of_measurement: "s"
-    icon: mdi:flask-empty
-    initial: 2
-
-input_select:
-  alarm_state:
-    name: Alarm state
-    icon: mdi:state-machine
-    options:
-      - disarmed
-      - arming
-      - armed
-      - triggered
-    initial: disarmed
 
 input_text:
+  # Captured by `jk_alarm: capture trigger reason` when the panel
+  # transitions to pending — readable in the push notification and
+  # surfaced on the alarm dashboard. Cleared on disarm.
   alarm_trigger_reason:
     name: Alarm trigger reason
     icon: mdi:information
     initial: ""
     max: 64
-  # Set by the sensor-availability automation when any required
-  # sensor reads `unavailable` / `unknown`. Dashboard reads this to
-  # surface a warning ("uwaga: czujnik X niedostępny") so the user
-  # knows the system is degraded.
-  alarm_sensor_status:
-    name: Alarm sensor status
-    icon: mdi:alert
-    initial: ""
-    max: 128
-  # Test-mode side-effect log. Each entry is `<timestamp> <event>` —
-  # the integration test reads this to verify that the right action
-  # would have fired in production.
+  # Test-mode side-effect log. Tests inspect this to verify the
+  # right service WOULD have fired in production.
   alarm_test_log:
     name: Alarm test log
     icon: mdi:notebook-edit
     initial: ""
     max: 255
 
-# Notification group — single point of edit when adding / removing a
-# family member's phone. Both the alarm trigger automation and the
-# low-battery automation below call `notify.alarm_recipients`.
+# ---- The alarm panel itself ----
+# `code_*_required: false` means no PIN — arming / disarming via service
+# call or the mobile-app widget succeeds without authentication. The
+# mobile app notification actions still require biometric / passcode
+# unlock via their own `authentication_required: true` flag.
+alarm_control_panel:
+  - platform: manual
+    name: Battery Room
+    code_arm_required: false
+    arming_time: 0
+    delay_time: 10
+    # Effectively-infinite trigger window. The HA docs claim
+    # `trigger_time: 0` disables auto-disarm, but in practice
+    # `trigger_time: 0` ends up disabling the triggered state
+    # entirely. Pick a value larger than any plausible siren run so
+    # the panel stays in `triggered` until manual disarm — the
+    # behaviour we want.
+    trigger_time: 86400
+    armed_away:
+      arming_time: 0
+      delay_time: 10
+      trigger_time: 86400
+
+# ---- Derived state ----
+# Declarative replacement for the old "sensor status writeback"
+# automation: `alarm_sensors_ok` is true iff every required sensor is
+# reporting a useful state (not unavailable, not unknown). The
+# auto-arm automation gates on this; the dashboard surfaces it as a
+# warning banner when false.
+template:
+  - binary_sensor:
+      - name: Alarm sensors ok
+        unique_id: alarm_sensors_ok
+        state: >-
+          {{ states('binary_sensor.battery_room_door_contact')
+             not in ['unavailable', 'unknown']
+             and states('binary_sensor.battery_room_motion_main_occupancy')
+             not in ['unavailable', 'unknown']
+             and states('binary_sensor.battery_room_motion_aux_occupancy')
+             not in ['unavailable', 'unknown'] }}
+        icon: >-
+          {% if is_state('binary_sensor.alarm_sensors_ok', 'on') %}
+            mdi:shield-check
+          {% else %}
+            mdi:shield-alert
+          {% endif %}
+  # `alarm_sensors_missing` — human-readable list of which sensors
+  # are unavailable, used by the dashboard banner. Empty when all
+  # are healthy. A regular `sensor:` because the state is a free-form
+  # string (Polish label list joined with commas).
+  - sensor:
+      - name: Alarm sensors missing
+        unique_id: alarm_sensors_missing
+        state: >-
+          {% set missing = namespace(s=[]) %}
+          {% set pairs = [
+            ('binary_sensor.battery_room_door_contact', 'czujnik drzwi'),
+            ('binary_sensor.battery_room_motion_main_occupancy', 'czujnik ruchu (główny)'),
+            ('binary_sensor.battery_room_motion_aux_occupancy', 'czujnik ruchu (pomocniczy)')
+          ] %}
+          {% for eid, label in pairs %}
+            {% if states(eid) in ['unavailable', 'unknown'] %}
+              {% set missing.s = missing.s + [label] %}
+            {% endif %}
+          {% endfor %}
+          {{ missing.s | join(', ') }}
+
+# ---- Notification group ----
+# Single point of edit when adding / removing a family member's phone.
 notify:
   - platform: group
     name: alarm_recipients
@@ -135,43 +173,45 @@ notify:
       - service: mobile_app_wojciechs_iphone
       - service: mobile_app_iphone_grzegorz
 
-# ---- FSM + side effects ----
+# ---- Automations ----
 automation:
-  # ---- disarmed → arming ----
-  # Auto-arm path. Fires the instant all conditions hold. No `for:` —
-  # the wait-and-prove-quiet phase happens in `arming → armed` next.
-  - alias: "jk_alarm: disarmed → arming"
-    id: jk_alarm_disarmed_to_arming
+  # ---- Trigger bridge: a sensor opening while the panel is `armed_away`
+  #      calls the panel's `alarm_trigger` service, which transitions
+  #      it through `pending` (entry-delay countdown) and into
+  #      `triggered`. The `manual.alarm_control_panel` platform has no
+  #      built-in sensor-triggers field — automations wire the world. ----
+  - alias: "jk_alarm: trigger panel on sensor open"
+    id: jk_alarm_trigger_panel_on_sensor_open
     mode: single
     trigger:
-      - platform: template
-        value_template: >-
-          {{ is_state('input_select.alarm_state', 'disarmed')
-             and is_state('input_boolean.alarm_auto_arm_enabled', 'on')
-             and is_state('binary_sensor.battery_room_door_contact', 'off')
-             and is_state('binary_sensor.battery_room_motion_main_occupancy', 'off')
-             and is_state('binary_sensor.battery_room_motion_aux_occupancy', 'off')
-             and states('binary_sensor.battery_room_door_contact') not in ['unavailable', 'unknown']
-             and states('binary_sensor.battery_room_motion_main_occupancy') not in ['unavailable', 'unknown']
-             and states('binary_sensor.battery_room_motion_aux_occupancy') not in ['unavailable', 'unknown'] }}
+      - platform: state
+        entity_id:
+          - binary_sensor.battery_room_door_contact
+          - binary_sensor.battery_room_motion_main_occupancy
+          - binary_sensor.battery_room_motion_aux_occupancy
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: alarm_control_panel.battery_room
+        state: armed_away
     action:
-      - service: input_select.select_option
+      - service: alarm_control_panel.alarm_trigger
         target:
-          entity_id: input_select.alarm_state
-        data:
-          option: arming
+          entity_id: alarm_control_panel.battery_room
 
-  # ---- arming → armed ----
-  # The whole expression must hold continuously for `quiet_minutes` (or
-  # the test-mode override) — any sensor going `on` breaks it, the `for:`
-  # timer restarts, and we stay in `arming`. Mirrors the FSM exactly.
-  - alias: "jk_alarm: arming → armed"
-    id: jk_alarm_arming_to_armed
+  # ---- Auto-arm: call arm_away once the room has been quiet for the
+  #      configured duration (or the test-mode override). The template
+  #      trigger's `for:` enforces continuous quiet — any sensor going
+  #      `on` breaks the expression and the timer restarts. ----
+  - alias: "jk_alarm: auto-arm"
+    id: jk_alarm_auto_arm
     mode: single
     trigger:
       - platform: template
         value_template: >-
-          {{ is_state('input_select.alarm_state', 'arming')
+          {{ is_state('alarm_control_panel.battery_room', 'disarmed')
+             and is_state('input_boolean.alarm_auto_arm_enabled', 'on')
+             and is_state('binary_sensor.alarm_sensors_ok', 'on')
              and is_state('binary_sensor.battery_room_door_contact', 'off')
              and is_state('binary_sensor.battery_room_motion_main_occupancy', 'off')
              and is_state('binary_sensor.battery_room_motion_aux_occupancy', 'off') }}
@@ -183,39 +223,20 @@ automation:
               {{ (states('input_number.alarm_arming_quiet_minutes') | int(5)) * 60 }}
             {% endif %}
     action:
-      - service: input_select.select_option
+      - service: alarm_control_panel.alarm_arm_away
         target:
-          entity_id: input_select.alarm_state
-        data:
-          option: armed
+          entity_id: alarm_control_panel.battery_room
 
-  # ---- armed → triggered ----
-  # State-trigger on any sensor opening; condition gate on armed + grace
-  # elapsed since entering armed. The reason field captures every sensor
-  # that's currently 'on' so the push notification can spell out what
-  # tripped (the FSM's old `triggerReason` field).
-  - alias: "jk_alarm: armed → triggered"
-    id: jk_alarm_armed_to_triggered
+  # ---- Capture which sensors are open at the moment the panel enters
+  #      `pending` (the 10 s entry-delay before triggered). Lets the
+  #      push notification spell out exactly what tripped. ----
+  - alias: "jk_alarm: capture trigger reason"
+    id: jk_alarm_capture_trigger_reason
     mode: single
     trigger:
       - platform: state
-        entity_id:
-          - binary_sensor.battery_room_door_contact
-          - binary_sensor.battery_room_motion_main_occupancy
-          - binary_sensor.battery_room_motion_aux_occupancy
-        to: "on"
-    condition:
-      - condition: state
-        entity_id: input_select.alarm_state
-        state: armed
-      - condition: template
-        value_template: >-
-          {% set grace = (
-            (states('input_number.alarm_test_grace_seconds') | int(2))
-            if is_state('input_boolean.alarm_test_mode', 'on')
-            else (states('input_number.alarm_arming_grace_seconds') | int(10))
-          ) %}
-          {{ (now() - states.input_select.alarm_state.last_changed).total_seconds() > grace }}
+        entity_id: alarm_control_panel.battery_room
+        to: pending
     action:
       - service: input_text.set_value
         target:
@@ -233,20 +254,15 @@ automation:
               {% set reasons = reasons + ['motion_aux'] %}
             {% endif %}
             {{ reasons | join(' · ') }}
-      - service: input_select.select_option
-        target:
-          entity_id: input_select.alarm_state
-        data:
-          option: triggered
 
-  # ---- side effect: push notification on triggered ----
-  # In test_mode, append to the test log instead of paging the family.
+  # ---- Side-effect: push notification on triggered (with actionable
+  #      lock-screen buttons). Test mode logs instead. ----
   - alias: "jk_alarm: notify on triggered"
     id: jk_alarm_notify_on_triggered
     mode: single
     trigger:
       - platform: state
-        entity_id: input_select.alarm_state
+        entity_id: alarm_control_panel.battery_room
         to: triggered
     action:
       - choose:
@@ -259,8 +275,7 @@ automation:
                 target:
                   entity_id: input_text.alarm_test_log
                 data:
-                  value: >-
-                    push:{{ states('input_text.alarm_trigger_reason') }}
+                  value: "push:{{ states('input_text.alarm_trigger_reason') }}"
         default:
           - service: notify.alarm_recipients
             data:
@@ -277,6 +292,9 @@ automation:
                 {% endfor %}
                 Wyzwolony przez: {{ ns.s }}
               data:
+                # iOS-specific critical-alert payload — bypasses Do Not
+                # Disturb and the silent switch. Android equivalents
+                # via channel + importance below.
                 push:
                   sound:
                     critical: 1
@@ -287,21 +305,30 @@ automation:
                 importance: high
                 ttl: 0
                 priority: high
+                # Lock-screen action buttons. `authentication_required`
+                # forces a Face ID / passcode unlock before the action
+                # fires, which is essential for a destructive disarm.
                 actions:
-                  - action: URI
+                  - action: "DISARM_BATTERY_ROOM"
+                    title: "Rozbroj"
+                    destructive: true
+                    authentication_required: true
+                  - action: "SILENCE_BATTERY_ROOM"
+                    title: "Wycisz syrenę"
+                    authentication_required: true
+                  - action: "URI"
                     title: "Otwórz panel"
                     uri: "/local/alarm.html"
 
-  # ---- side effect: siren on/off ----
-  # Production: call siren.turn_on with the configured duration. Device
-  # auto-quiets after `duration` seconds; the alarm state stays `triggered`
-  # until the user disarms. Test mode logs instead.
+  # ---- Side-effect: siren on triggered. The siren auto-quiets after
+  #      its `duration` parameter; the panel state stays `triggered`
+  #      (since trigger_time: 0). ----
   - alias: "jk_alarm: siren on triggered"
     id: jk_alarm_siren_on_triggered
     mode: single
     trigger:
       - platform: state
-        entity_id: input_select.alarm_state
+        entity_id: alarm_control_panel.battery_room
         to: triggered
     action:
       - choose:
@@ -314,8 +341,7 @@ automation:
                 target:
                   entity_id: input_text.alarm_test_log
                 data:
-                  value: >-
-                    siren_on:{{ states('input_number.alarm_siren_duration_s') | int(60) }}
+                  value: "siren_on:{{ states('input_number.alarm_siren_duration_s') | int(60) }}"
         default:
           - service: siren.turn_on
             target:
@@ -323,12 +349,13 @@ automation:
             data:
               duration: "{{ states('input_number.alarm_siren_duration_s') | int(60) }}"
 
-  - alias: "jk_alarm: siren off on disarm"
-    id: jk_alarm_siren_off_on_disarm
+  # ---- Side-effect: siren off + reason clear on disarm. ----
+  - alias: "jk_alarm: cleanup on disarm"
+    id: jk_alarm_cleanup_on_disarm
     mode: single
     trigger:
       - platform: state
-        entity_id: input_select.alarm_state
+        entity_id: alarm_control_panel.battery_room
         to: disarmed
     action:
       - service: input_text.set_value
@@ -352,40 +379,39 @@ automation:
             target:
               entity_id: siren.battery_room_siren
 
-  # ---- sensor-availability writeback ----
-  # Watches the three required sensors. When any reads `unavailable` /
-  # `unknown`, write a human-readable degraded-state message into
-  # `input_text.alarm_sensor_status` — the dashboard surfaces it as a
-  # warning banner. When everything is healthy, clear the field.
-  - alias: "jk_alarm: sensor status writeback"
-    id: jk_alarm_sensor_status_writeback
-    mode: single
+  # ---- Mobile-app notification action callbacks. Both actions arrive
+  #      via the `mobile_app_notification_action` event; the choose:
+  #      block dispatches by the `action` key. ----
+  - alias: "jk_alarm: handle notification action"
+    id: jk_alarm_handle_notification_action
+    mode: parallel
+    max: 5
     trigger:
-      - platform: state
-        entity_id:
-          - binary_sensor.battery_room_door_contact
-          - binary_sensor.battery_room_motion_main_occupancy
-          - binary_sensor.battery_room_motion_aux_occupancy
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: DISARM_BATTERY_ROOM
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: SILENCE_BATTERY_ROOM
     action:
-      - service: input_text.set_value
-        target:
-          entity_id: input_text.alarm_sensor_status
-        data:
-          value: >-
-            {% set missing = [] %}
-            {% set pairs = [
-              ('binary_sensor.battery_room_door_contact', 'czujnik drzwi'),
-              ('binary_sensor.battery_room_motion_main_occupancy', 'czujnik ruchu (główny)'),
-              ('binary_sensor.battery_room_motion_aux_occupancy', 'czujnik ruchu (pomocniczy)')
-            ] %}
-            {% for eid, label in pairs %}
-              {% if states(eid) in ['unavailable', 'unknown'] %}
-                {% set missing = missing + [label] %}
-              {% endif %}
-            {% endfor %}
-            {% if missing %}czujnik niedostępny: {{ missing | join(', ') }}{% else %}{% endif %}
+      - choose:
+          - conditions:
+              - "{{ trigger.event.data.action == 'DISARM_BATTERY_ROOM' }}"
+            sequence:
+              - service: alarm_control_panel.alarm_disarm
+                target:
+                  entity_id: alarm_control_panel.battery_room
+          - conditions:
+              - "{{ trigger.event.data.action == 'SILENCE_BATTERY_ROOM' }}"
+            sequence:
+              - service: siren.turn_off
+                target:
+                  entity_id: siren.battery_room_siren
 
-  # ---- low-battery alert (unchanged) ----
+  # ---- Low-battery alert — unchanged, still fires off the per-device
+  #      `*_battery_low` binary sensors Z2M exposes. ----
   - alias: alarm_sensor_battery_low
     description: Notify family when an alarm sensor's battery is low.
     mode: single

@@ -2,7 +2,7 @@
 //
 // Alarm-history dashboard — paired with `dashboard/history/index.html`.
 // Reads HA's `/api/logbook/...` + `/api/history/period/...` REST endpoints
-// for `input_select.alarm_state` and `binary_sensor.battery_room_door_contact`
+// for `alarm_control_panel.battery_room` and `binary_sensor.battery_room_door_contact`
 // and renders four widgets:
 //   1. stat tiles — armed time, door-open time, trigger / disarm counts
 //   2. door Gantt — open/closed bands with day/night shading
@@ -19,10 +19,28 @@ const HA_URL = '';
 const TOKEN = 'PASTE_LONG_LIVED_ACCESS_TOKEN_HERE';
 
 const E = {
-  alarmState: 'input_select.alarm_state',
+  // After Phase 2 the canonical alarm state is the alarm_control_panel
+  // entity, not the old input_select. Events recorded before that
+  // migration live under `input_select.alarm_state` — they're not
+  // surfaced here. Old USER_MAP entries are kept (see below) so user
+  // attribution on lingering events still renders if HA's recorder
+  // ever joins the two histories.
+  alarmState: 'alarm_control_panel.battery_room',
   triggerReason: 'input_text.alarm_trigger_reason',
   door: 'binary_sensor.battery_room_door_contact',
 };
+
+// alarm_control_panel uses `armed_away` for the armed state and
+// `pending` for the entry-delay window before triggered. The old
+// FSM had a single `armed`. Canonicalise so the rest of this file
+// treats `armed_away` and the legacy `armed` interchangeably, and
+// treats `pending` as an alarm-active state (it's already past the
+// armed→pending transition by the time it's recorded).
+function canonState(s) {
+  if (s === 'armed_away') return 'armed';
+  if (s === 'pending') return 'armed';
+  return s;
+}
 
 // Map opaque context_user_ids → friendly labels. Populated empirically
 // from the live logbook; tweak as new users appear. The `Node-RED`
@@ -120,8 +138,9 @@ function renderTriggers(logbook, reasonLogbook) {
   card.innerHTML = '';
   // Pair each "triggered" → next "disarmed" (or now). Reason at
   // trigger time comes from the input_text.alarm_trigger_reason
-  // logbook entry that lands just before the state flip (Node-RED
-  // sets reason first, then state).
+  // logbook entry — the `capture trigger reason` automation writes
+  // it on the panel's `pending` transition, so it lands shortly
+  // before the `triggered` state event.
   const alarmEvents = logbook.filter((e) => e.entity_id === E.alarmState);
   const triggers = [];
   for (let i = 0; i < alarmEvents.length; i++) {
@@ -129,16 +148,20 @@ function renderTriggers(logbook, reasonLogbook) {
     const t0 = new Date(alarmEvents[i].when);
     const next = alarmEvents.slice(i + 1).find((e) => e.state === 'disarmed');
     const disarmed = next ? new Date(next.when) : null;
-    // The Node-RED flow writes the reason input_text right AFTER it
-    // writes the state input_select, so the reason entry lands a few
-    // ms after t0. Use a ±5 s window centred on the trigger and pick
-    // the closest.
+    // Reason write happens on the panel's armed→pending transition
+    // (~delay_time seconds before triggered), so widen the search
+    // window to ±15 s and pick the closest sample. The legacy ±5 s
+    // worked when Node-RED wrote both within milliseconds of each
+    // other; the new flow has the entry-delay gap in between.
     const reasonEntry = reasonLogbook
-      .filter((e) => e.entity_id === E.triggerReason && Math.abs(new Date(e.when) - t0) < 5000)
+      .filter((e) => e.entity_id === E.triggerReason && Math.abs(new Date(e.when) - t0) < 15000)
       .sort((a, b) => Math.abs(new Date(a.when) - t0) - Math.abs(new Date(b.when) - t0))[0];
     const reason = reasonEntry?.state || '';
-    // Time-armed-before-trip: find the previous "armed" before t0.
-    const armed = [...alarmEvents.slice(0, i)].reverse().find((e) => e.state === 'armed');
+    // Time-armed-before-trip: find the previous armed event (either
+    // the panel's `armed_away` or the legacy `armed`) before t0.
+    const armed = [...alarmEvents.slice(0, i)]
+      .reverse()
+      .find((e) => canonState(e.state) === 'armed');
     triggers.push({
       at: t0,
       reason,
@@ -275,20 +298,23 @@ function renderDoorGantt(history, from, to) {
 }
 
 function renderStats(alarmHistory, doorHistory, from, to) {
-  // armed time = total time in state 'armed' or 'triggered' across the
-  // alarm-state history. ('arming' is excluded — it's the warmup.)
+  // armed time = total time in any "alarm active" state (armed_away,
+  // pending entry-delay, or triggered). `arming` is excluded — that's
+  // the legacy FSM warmup window, no longer a real panel state but
+  // may appear in pre-Phase-2 recorder data.
   const alarmIv = toIntervals(alarmHistory, from, to);
   let armedMs = 0;
   let disarmCount = 0;
   let triggerCount = 0;
   let prevState = null;
   for (const iv of alarmIv) {
-    if (iv.state === 'armed' || iv.state === 'triggered') {
+    const s = canonState(iv.state);
+    if (s === 'armed' || s === 'triggered') {
       armedMs += iv.to - iv.from;
     }
-    if (iv.state === 'triggered' && prevState !== 'triggered') triggerCount++;
-    if (iv.state === 'disarmed' && prevState !== 'disarmed' && prevState !== null) disarmCount++;
-    prevState = iv.state;
+    if (s === 'triggered' && prevState !== 'triggered') triggerCount++;
+    if (s === 'disarmed' && prevState !== 'disarmed' && prevState !== null) disarmCount++;
+    prevState = s;
   }
 
   // door-open time

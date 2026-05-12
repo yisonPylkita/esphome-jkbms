@@ -85,6 +85,14 @@ main {
 .state-name.armed {
   color: var(--bms-green);
 }
+/* `pending` is the alarm panel's entry-delay countdown — a sensor went
+   on while armed and the user has seconds to disarm before the siren
+   fires. Same urgency cue as `triggered` (amber-pulse), but distinct
+   so the eye can tell "about to fire" from "firing now". */
+.state-name.pending {
+  color: var(--bms-amber);
+  animation: alarm-pulse 0.6s ease-in-out infinite;
+}
 .state-name.triggered {
   color: var(--bms-red);
   animation: alarm-pulse 1.2s ease-in-out infinite;
@@ -99,6 +107,7 @@ main {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .state-name.pending,
   .state-name.triggered {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

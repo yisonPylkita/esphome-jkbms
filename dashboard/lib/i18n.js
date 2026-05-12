@@ -74,11 +74,6 @@ const T = {
     // `minut` and put `wymagane` in the wrong case.
     'alarm.adv.quiet.desc':
       'liczba minut zamkniętych drzwi i braku ruchu wymaganych przed auto-uzbrojeniem',
-    // "karencja" is legal/medical jargon. The alarm-domain Polish term
-    // for the exit-delay grace window is "czas wyjścia".
-    'alarm.adv.grace.name': 'czas wyjścia (s)',
-    'alarm.adv.grace.desc':
-      'ile sekund po uzbrojeniu czujniki są ignorowane (czas na opuszczenie pomieszczenia)',
     'alarm.adv.siren.name': 'czas pracy syreny (s)',
     'alarm.adv.siren.desc':
       'jak długo wyje syrena po wyzwoleniu; alarm pozostaje aktywny aż do rozbrojenia',
@@ -86,9 +81,16 @@ const T = {
     'alarm.toggle.main.title': 'Wróć do panelu głównego',
     'alarm.state.disarmed': 'ROZBROJONY',
     'alarm.state.arming': 'UZBRAJANIE',
+    // `armed_away` is HA's canonical name; both keys exist so the
+    // dashboard can use either without a translation lookup hop.
     'alarm.state.armed': 'UZBROJONY',
+    'alarm.state.armed_away': 'UZBROJONY',
+    // `pending` is the panel's entry-delay state — sensor went on,
+    // disarm-now grace window before the siren fires.
+    'alarm.state.pending': 'ALARM ZA CHWILĘ',
     'alarm.state.triggered': 'ALARM',
     'alarm.detail.arming': 'uzbrojenie za {0} — musi być cicho',
+    'alarm.detail.pending': 'rozbrój teraz — alarm za {0}',
     'alarm.detail.armed': 'uzbrojony od {0}',
     'alarm.detail.triggered': '{0} · {1} temu',
     'alarm.cause.door': 'otwarcie drzwi',
@@ -113,7 +115,9 @@ const T = {
     'history.stat.triggerCount': 'wyzwolenia alarmu',
     'history.stat.disarmCount': 'rozbrojenia',
     'history.event.armed': 'uzbrojony',
+    'history.event.armed_away': 'uzbrojony',
     'history.event.arming': 'rozpoczęto uzbrajanie',
+    'history.event.pending': 'wykryto wtargnięcie',
     'history.event.disarmed': 'rozbrojony',
     'history.event.triggered': 'alarm wyzwolony',
     'history.event.unknown': 'inny stan',
@@ -179,19 +183,19 @@ const T = {
     'alarm.adv.summary': 'advanced settings',
     'alarm.adv.quiet.name': 'arming quiet window (min)',
     'alarm.adv.quiet.desc': 'minutes of closed door and no motion required before auto-arm',
-    'alarm.adv.grace.name': 'post-arm grace (s)',
-    'alarm.adv.grace.desc':
-      'seconds after arming during which sensors are ignored (time to leave the room)',
     'alarm.adv.siren.name': 'siren duration (s)',
     'alarm.adv.siren.desc':
       'how long the siren rings after a trip; alarm state stays latched until disarmed',
     'alarm.toggle.main.text': '‹ main',
-    'alarm.toggle.main.title': 'Back to main dashboard',
+    'alarm.toggle.main.title': 'Back to the main panel',
     'alarm.state.disarmed': 'DISARMED',
     'alarm.state.arming': 'ARMING',
     'alarm.state.armed': 'ARMED',
+    'alarm.state.armed_away': 'ARMED',
+    'alarm.state.pending': 'TRIGGERING',
     'alarm.state.triggered': 'TRIGGERED',
     'alarm.detail.arming': 'arming in {0} — needs quiet',
+    'alarm.detail.pending': 'disarm now — alarm in {0}',
     'alarm.detail.armed': 'armed for {0}',
     'alarm.detail.triggered': '{0} · {1} ago',
     'alarm.cause.door': 'door opened',
@@ -215,7 +219,9 @@ const T = {
     'history.stat.triggerCount': 'alarm trips',
     'history.stat.disarmCount': 'disarms',
     'history.event.armed': 'armed',
+    'history.event.armed_away': 'armed',
     'history.event.arming': 'arming started',
+    'history.event.pending': 'intrusion detected',
     'history.event.disarmed': 'disarmed',
     'history.event.triggered': 'alarm triggered',
     'history.event.unknown': 'other state',
