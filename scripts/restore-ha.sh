@@ -11,10 +11,8 @@
 #   3. Push the core configuration.yaml.
 #   4. Push the Z2M configuration.yaml (with secrets still requiring
 #      hand-fill — search for `<<REPLACE_*>>` markers on the box).
-#   5. Push the Node-RED flows.json (sanitised: server-config IDs are
-#      blank, Node-RED prompts to assign on first import).
-#   6. Hand off to scripts/deploy-ha.sh for dashboards + fonts +
-#      packages + helper reloads.
+#   5. Hand off to scripts/deploy-ha.sh for dashboards + fonts +
+#      packages (which includes the alarm automations) + reloads.
 #
 # What it does NOT do (because it can't):
 #   * Re-pair Zigbee devices — restore your `coordinator_backup.json`
@@ -128,23 +126,14 @@ if [ "$MODE" = "full" ] || [ "$MODE" = "configs" ]; then
   ok "Z2M configuration.yaml in place"
   manual "Edit /config/zigbee2mqtt/configuration.yaml on the box: replace <<REPLACE_*>> markers, restore network_key/pan_id/ext_pan_id from your coordinator_backup.json (kept out-of-repo), or let Z2M generate fresh ones on next boot (will require re-pairing)."
 
-  # ---- 4. Push Node-RED flows.json ----
-  echo
-  info "Pushing /addon_configs/a0d7b954_nodered/flows.json..."
-  $SSH "mkdir -p /addon_configs/a0d7b954_nodered"
-  $SCP "$HERE/homeassistant/node-red/flows.json"  "$HA_USER@$HA_HOST:/addon_configs/a0d7b954_nodered/flows.json"
-  $SCP "$HERE/homeassistant/node-red/settings.js" "$HA_USER@$HA_HOST:/addon_configs/a0d7b954_nodered/settings.js"
-  ok "Node-RED flows.json + settings.js in place"
-  manual "First Node-RED start: open the editor and assign the Home Assistant server config to every node (the import sanitised those refs to empty strings)."
-
-  # ---- 5. Validate HA config ----
+  # ---- 4. Validate HA config ----
   echo
   info "Validating HA config..."
   $SSH "ha core check" >/dev/null && ok "ha core check passes"
 fi
 [ "$MODE" = "configs" ] && exit 0
 
-# ---- 6. Hand off to deploy-ha.sh for dashboards + helper packages ----
+# ---- 5. Hand off to deploy-ha.sh for dashboards + helper packages ----
 echo
 info "Running scripts/deploy-ha.sh for dashboards + helpers..."
 bash "$HERE/scripts/deploy-ha.sh"

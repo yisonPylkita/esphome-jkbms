@@ -40,10 +40,6 @@ armed → triggered`) driven by Zigbee motion + door sensors, and the
   side-effects (Zigbee siren + critical-priority push on trip). Deploys
   to `/config/packages/jk_alarm.yaml`. Integration-tested by
   `scripts/test-alarm-ha.sh` — see "Testing the alarm" below.
-- **`homeassistant/node-red/flows.json`** — Node-RED workspace snapshot.
-  The alarm tab is **disabled** (the package above replaced it); kept
-  here for one release as a rollback option and as the future home for
-  any flows that need Node-RED's visual editor.
 - **`scripts/deploy-ha.sh`** — one-shot deploy / re-deploy to a Home
   Assistant box (substitutes the API token, mirrors fonts, idempotently
   installs helpers, reloads helper domains, runs `ha core check`).
@@ -201,8 +197,7 @@ the history view.
 The whole alarm system lives in `homeassistant/alarm-helpers.yaml`,
 deployed by `just deploy` to `/config/packages/jk_alarm.yaml`. Helpers,
 FSM transitions, and side-effect automations are co-located in that one
-file so the alarm is a single auditable unit. No Node-RED running for
-this; the old flow stays in the repo (disabled) as a rollback option.
+file so the alarm is a single auditable unit.
 
 State machine (`input_select.alarm_state`):
 
@@ -222,8 +217,10 @@ the automations watch sensor state changes (template triggers with
 `scripts/test-alarm-ha.sh` (or `just test-alarm`) drives the live HA
 instance via REST: pokes sensor states, waits for the right
 automation to fire, asserts the resulting `input_select.alarm_state`.
-Mirrors every scenario from `tests/alarm-fsm.test.js` so the
-implementation stays behaviour-equivalent.
+Every behaviour the FSM has to honour (auto-arm path, disturbance
+mid-arming, grace suppression, trigger-reason aggregation, latched-
+triggered, sensor-availability gating, manual disarm side-effects) is
+one or more assertions here — this script is the spec.
 
 Destructive side-effects are stubbed by flipping
 `input_boolean.alarm_test_mode` on — the siren and push automations
@@ -239,7 +236,7 @@ The same primitives work interactively in the HA UI:
 - **Automation Traces** (next to each automation in the UI) — the last
   five runs are persisted with a full step-by-step trace: which
   trigger fired, what each condition evaluated to, every action's
-  variables. The Node-RED debug pane on steroids.
+  variables.
 - **"Run actions"** button — execute the action sequence without
   satisfying the trigger; useful when verifying side-effect chains.
 
@@ -265,15 +262,13 @@ The same primitives work interactively in the HA UI:
 │   │   ├── predict.js             Rolling-mean power → runtime projection
 │   │   ├── sun.js                 Sunrise/sunset (for the history Gantt shading)
 │   │   ├── zones.js               SOC / V / T zone tables
-│   │   ├── alarm-fsm.js           Canonical alarm FSM (mirrored into flows.json)
 │   │   └── version-check.js       /local/version.json poller → hard reload on commit drift
 │   ├── favicon.svg            PWA icon — vertical battery, dashboard palette
 │   └── fonts/                 Self-hosted DSEG7 Modern Bold (OFL 1.1)
 ├── homeassistant/
-│   ├── alarm-helpers.yaml     Helpers consumed by the alarm flow
+│   ├── alarm-helpers.yaml     Alarm package (helpers + automations + side-effects)
 │   ├── core/                  /config/configuration.yaml + HA_VERSION
 │   ├── addons/                Per-addon options snapshots (.json)
-│   ├── node-red/              flows.json + settings.js + package.json
 │   └── zigbee2mqtt/           Z2M configuration.yaml (secrets stripped)
 ├── tests/                     Node-driven unit tests for dashboard/lib/*
 ├── scripts/
@@ -283,6 +278,7 @@ The same primitives work interactively in the HA UI:
 │   ├── fmt.sh                 prettier + ruff format runner
 │   ├── check.sh               Validation gates (run by `just check`)
 │   ├── test.sh                Node test runner
+│   ├── test-alarm-ha.sh       Integration test for the alarm against live HA
 │   └── minify-html.py         Inline CSS/JS minifier (used by deploy)
 └── inverter/
     └── easun.yaml             Easun inverter firmware (unrelated to BMS)
@@ -339,10 +335,10 @@ is deliberately English-only.
 
 ### Adding a push-notification target
 
-Both the alarm trigger (Node-RED) and the low-battery automation
-(HA-side) call `notify.alarm_recipients`, a notification **group**
-defined in `homeassistant/alarm-helpers.yaml`. To add a third family
-member's phone, edit the group's `services:` list:
+The alarm-trigger and low-battery automations both call
+`notify.alarm_recipients`, a notification **group** defined in
+`homeassistant/alarm-helpers.yaml`. To add a third family member's
+phone, edit the group's `services:` list:
 
 ```yaml
 notify:
@@ -356,7 +352,7 @@ notify:
 
 Then `just deploy` (pushes the updated helpers) and restart HA core
 (notify groups are registered at startup; `homeassistant.reload_core_config`
-is enough). One place to edit; no Node-RED flow surgery needed.
+is enough).
 
 ### Sensor health: unavailable + low battery
 
@@ -374,23 +370,15 @@ The FSM treats sensor problems as part of the alarm posture:
 
 ### Mapping HA user IDs to friendly names
 
-The alarm-history dashboard shows `przez panel` / `przez Node-RED` etc.
-based on a hardcoded `USER_MAP` in `dashboard/history/app.js`. New
+The alarm-history dashboard shows `przez panel` / `przez automatyzacja`
+etc. based on a hardcoded `USER_MAP` in `dashboard/history/app.js`. New
 family-member HA accounts show up as raw 6-char hex prefixes until
 added. To resolve: open `dashboard/history/app.js`, add the user's full
 UUID → friendly-label mapping to `USER_MAP`, then re-deploy. Find the
 UUID via HA → Settings → People → Users → click user → the URL
-contains it.
-
-### FSM-sync between lib and Node-RED flow
-
-`dashboard/lib/alarm-fsm.js` is the canonical alarm FSM. A byte-equal
-copy lives inside `homeassistant/node-red/flows.json` (the function node
-named "Alarm FSM", between `// SYNC-START` and `// SYNC-END` markers).
-When you edit the lib, you must hand-copy the body into the flow file;
-`scripts/check.sh` fails if the two drift. The check script's failure
-message points at the exact diff. A small Python helper script in git
-history can re-sync mechanically if needed.
+contains it. The legacy `Node-RED` entry is retained so events recorded
+before the FSM was ported to native HA still render with a readable
+label.
 
 ## `just` recipes
 
@@ -399,8 +387,10 @@ Run `just` with no arguments to print the recipe list. Highlights:
 - `just setup` — first-time bootstrap (uv sync + node download).
 - `just fmt` — format every supported file (prettier + ruff).
 - `just check` — every validation gate (formatter, JSON, esphome
-  config, HTML parse, link integrity, minifier round-trip, FSM-sync,
-  secrets scan).
+  config, HTML parse, link integrity, minifier round-trip, secrets scan).
+- `just test-alarm` — drive the live HA alarm through every FSM
+  transition via REST. Side-effects routed to a log entity so it's
+  safe to run while the real alarm is in service.
 - `just test` — Node-driven unit tests against `dashboard/lib/*.js`.
 - `just ci` — `fmt-check + check + test`, what CI runs.
 - `just deploy` — `check + test` then push to HA.
@@ -421,17 +411,12 @@ homeassistant/
 ├── addons/
 │   ├── 5c53de3b_esphome.json       Add-on options snapshot
 │   ├── 45df7312_zigbee2mqtt.json
-│   ├── a0d7b954_nodered.json
 │   ├── a0d7b954_ssh.json
 │   ├── a0d7b954_tailscale.json
 │   ├── cb646a50_get.json           HACS install helper (one-shot)
 │   └── core_mosquitto.json
-├── zigbee2mqtt/
-│   └── configuration.yaml          Z2M config — secrets stripped
-└── node-red/
-    ├── flows.json                  Full flows (server-config IDs blanked)
-    ├── settings.js
-    └── package.json
+└── zigbee2mqtt/
+    └── configuration.yaml          Z2M config — secrets stripped
 ```
 
 To restore from scratch:
@@ -444,8 +429,8 @@ To restore from scratch:
    (especially `ha_host`, `ha_user`, `ha_token`).
 4. `just restore` — installs each add-on (or prompts you to add the
    community repo for ones it can't auto-find), applies every saved
-   options snapshot, pushes the core configuration, Z2M config, and
-   Node-RED flows, then hands off to `just deploy` for the dashboards.
+   options snapshot, pushes the core configuration and Z2M config,
+   then hands off to `just deploy` for the dashboards + alarm package.
 
 What `just restore` cannot automate (it'll print `▸ MANUAL STEP` lines
 where these come up):
@@ -469,9 +454,6 @@ where these come up):
   `/config/zigbee2mqtt/configuration.yaml` — hand-fill the MQTT
   password and (optional) network key / pan_id before Z2M's first
   start.
-- **Node-RED server-config assignment.** On first start, open the
-  editor and assign the HA server config to every imported node — the
-  `flows.json` snapshot has these blanked for portability.
 
 Add-on options are applied via the Supervisor REST API
 (`POST /addons/<slug>/options`). The Supervisor token used for that

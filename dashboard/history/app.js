@@ -25,7 +25,9 @@ const E = {
 };
 
 // Map opaque context_user_ids → friendly labels. Populated empirically
-// from the live logbook; tweak as new users appear.
+// from the live logbook; tweak as new users appear. The `Node-RED`
+// entry is retained so historical events (from before the alarm was
+// ported to native HA automations) still render with a readable label.
 const USER_MAP = {
   '4eb50da6dc484dd099075a00726c595c': 'panel',
   '452e9d31c726462d967c63e7ff9acaad': 'Node-RED',

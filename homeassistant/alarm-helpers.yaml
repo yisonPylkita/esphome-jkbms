@@ -2,9 +2,9 @@
 #
 # This file is the complete alarm system: helpers (state, knobs), the FSM
 # expressed as HA automations, and the side-effect actions (siren, push).
-# Replaces the Node-RED flow. Dashboard contract is unchanged —
-# `input_select.alarm_state` remains the single source of truth and the
-# dashboard's ARM/DISARM buttons still write to it.
+# `input_select.alarm_state` is the single source of truth; the dashboard's
+# ARM/DISARM buttons write to it directly and the automations below
+# react to its value.
 #
 # Deployed by `scripts/deploy-ha.sh` as `/config/packages/jk_alarm.yaml`.
 # HA merges each file in `/config/packages/` per-domain via the

@@ -4,8 +4,10 @@
 #
 # Drives the live Home Assistant instance via REST: pokes input_select /
 # binary_sensor states, waits for the automations to fire, asserts the
-# resulting state. Mirrors the scenarios in tests/alarm-fsm.test.js so the
-# two implementations stay behaviour-equivalent.
+# resulting state. Acts as the spec — every scenario the FSM must honour
+# (auto-arm path, disturbance reset, grace suppression, trigger reason
+# aggregation, latched-triggered, sensor-availability gating, manual
+# disarm side-effects) is one or more assertions here.
 #
 # Side-effects (siren, push) are stubbed: each test flips
 # `input_boolean.alarm_test_mode` on, so the automations write to

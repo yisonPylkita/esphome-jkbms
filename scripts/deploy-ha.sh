@@ -247,4 +247,4 @@ echo "    http://$HA_HOST:8123/local/bms-dashboard.html"
 echo "    http://$HA_HOST:8123/local/alarm.html"
 echo
 echo "Reminder: on a fresh HA install run \`just restore\` first — it"
-echo "imports homeassistant/node-red/flows.json among other things."
+echo "installs the supervisor addons and pushes the core / Z2M configs."
