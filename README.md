@@ -177,19 +177,26 @@ Other useful deploy modes:
 
 URLs once deployed:
 
-| Page          | URL                                          |
-| ------------- | -------------------------------------------- |
-| Main BMS      | `http://<ha>:8123/local/bms-integrated.html` |
-| Alarm         | `http://<ha>:8123/local/alarm.html`          |
-| Alarm history | `http://<ha>:8123/local/alarm-history.html`  |
-| Diagnostic    | `http://<ha>:8123/local/bms-dashboard.html`  |
+| Page          | URL (preferred — Tailscale HTTPS)             | URL (LAN fallback)                           |
+| ------------- | --------------------------------------------- | -------------------------------------------- |
+| Main BMS      | `https://<ts-host>/local/bms-integrated.html` | `http://<ha>:8123/local/bms-integrated.html` |
+| Alarm         | `https://<ts-host>/local/alarm.html`          | `http://<ha>:8123/local/alarm.html`          |
+| Alarm history | `https://<ts-host>/local/alarm-history.html`  | `http://<ha>:8123/local/alarm-history.html`  |
+| Diagnostic    | `https://<ts-host>/local/bms-dashboard.html`  | `http://<ha>:8123/local/bms-dashboard.html`  |
 
-For remote access the canonical entry point is the Tailscale-served
-HTTPS hostname (e.g. `https://fotowoltaika.tailaa1b4.ts.net/local/...`);
-the LAN URL above is the fallback. Each dashboard bakes `HA_URL = ''`
-so requests go to the same origin that served the page — meaning every
-HA-routable URL (LAN IP, Tailscale magic DNS, `tailscale serve`
-HTTPS hostname) works without rebuilding.
+The HTTPS endpoint is provided by the Tailscale add-on's
+`share_homeassistant: serve` mode (port 443, valid Let's Encrypt cert
+via Tailscale's own ACME — no browser warnings). It proxies to HA's
+:8123 internally, so every path (`/local/*`, `/api/*`, etc.) works.
+**Always prefer HTTPS** — the plain-HTTP :8123 form ships passwords
+and Bearer tokens in cleartext over the network. Put your
+`https://<host>.ts.net` URL in `secrets.yaml` as `ha_https_url` and
+`scripts/deploy-ha.sh` will print it as the canonical link.
+
+Each dashboard bakes `HA_URL = ''` so requests go to the same origin
+that served the page — meaning every HA-routable URL (LAN IP,
+Tailscale magic DNS, `tailscale serve` HTTPS hostname) works without
+rebuilding.
 
 Press **A** on the main page to swap to advanced; the `alarm ›`
 link goes to the alarm dashboard, which has its own `historia ›` to

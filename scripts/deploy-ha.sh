@@ -54,6 +54,10 @@ HA_HOST="${HA_HOST:-$(get ha_host)}"
 HA_USER="${HA_USER:-$(get ha_user)}"
 HA_TOKEN="${HA_TOKEN:-$(get ha_token)}"
 HA_USER="${HA_USER:-root}"
+# Optional HTTPS endpoint (Tailscale Serve), used purely for the
+# "Deploy complete" hint at the end so the user doesn't accidentally
+# bookmark the plain-HTTP :8123 LAN form.
+HA_HTTPS_URL="${HA_HTTPS_URL:-$(get ha_https_url)}"
 
 if [ -z "${HA_HOST:-}" ] || [ -z "${HA_TOKEN:-}" ]; then
   echo "ERROR: ha_host and ha_token must be set in secrets.yaml or env." >&2
@@ -241,10 +245,26 @@ ALARM_COUNT=$(/usr/bin/curl -s -H "Authorization: Bearer $HA_TOKEN" \
 echo "  $ALARM_COUNT alarm_* entities present"
 
 echo
-echo "✓ Deploy complete. Dashboards at:"
-echo "    http://$HA_HOST:8123/local/bms-integrated.html"
-echo "    http://$HA_HOST:8123/local/bms-dashboard.html"
-echo "    http://$HA_HOST:8123/local/alarm.html"
+# Prefer the HTTPS URL when configured; the LAN HTTP form goes via the
+# unencrypted :8123 path and trips up browsers that flag it as "not
+# secure". Fall back to LAN if no HTTPS endpoint is set.
+if [ -n "${HA_HTTPS_URL:-}" ]; then
+  BASE_URL="${HA_HTTPS_URL%/}"
+  echo "✓ Deploy complete. Dashboards at:"
+  echo "    $BASE_URL/local/bms-integrated.html"
+  echo "    $BASE_URL/local/bms-dashboard.html"
+  echo "    $BASE_URL/local/alarm.html"
+  echo "    $BASE_URL/local/alarm-history.html"
+else
+  echo "✓ Deploy complete. Dashboards at:"
+  echo "    http://$HA_HOST:8123/local/bms-integrated.html"
+  echo "    http://$HA_HOST:8123/local/bms-dashboard.html"
+  echo "    http://$HA_HOST:8123/local/alarm.html"
+  echo "    http://$HA_HOST:8123/local/alarm-history.html"
+  echo
+  echo "Hint: set \`ha_https_url\` in secrets.yaml to print the Tailscale-"
+  echo "      Serve HTTPS URL here instead (the :8123 LAN form is not TLS)."
+fi
 echo
 echo "Reminder: on a fresh HA install run \`just restore\` first — it"
 echo "installs the supervisor addons and pushes the core / Z2M configs."
