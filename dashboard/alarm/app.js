@@ -8,9 +8,10 @@
 // knobs) and the underlying sensors. Writes back through the standard
 // `alarm_control_panel.alarm_arm_away` / `alarm_disarm` services.
 //
-// State translation is local: HA's panel states are the canonical
-// English (disarmed / armed_away / pending / triggered) and we map
-// them to Polish on display via the `alarm.state.*` i18n keys.
+// State translation is local: the alarm uses the 2-state model
+// (disarmed / armed_away) only; "alarm currently active" is signalled
+// by a non-empty `input_text.alarm_trigger_reason`, not a separate
+// panel state. We map both to Polish on display via `alarm.state.*`.
 
 document.addEventListener('DOMContentLoaded', () => {
   applyI18n();
@@ -37,11 +38,12 @@ const E = {
 };
 
 // Map panel.state → CSS class for the hero. `armed_away` collapses
-// to the existing `armed` class so the green colour and any tooling
-// keyed on it keep working; `pending` gets its own urgent style.
+// to `armed`. The `triggered` class is still used for the alarm-
+// active styling — it's now applied when the reason field is
+// non-empty, not when the panel itself is in a triggered state.
 function stateClass(panelState) {
   if (panelState === 'armed_away') return 'armed';
-  return panelState; // disarmed | arming | pending | triggered
+  return panelState; // disarmed | armed
 }
 
 // ---- Actions ----
@@ -172,18 +174,27 @@ async function tick() {
 
     const stateVal = panel.state;
     const stateName = $('state-name');
-    // CSS class for colour / animation — collapse armed_away → armed.
-    stateName.className = 'state-name ' + stateClass(stateVal);
-    // Display label — `alarm.state.*` keys are keyed on the panel's
-    // canonical state names; `armed_away` and `armed` both fall back
-    // to the same Polish "UZBROJONY" via the i18n table.
-    stateName.textContent = t('alarm.state.' + stateVal) || stateVal.toUpperCase();
+    // "Alarm currently active" is signalled by a non-empty trigger
+    // reason — the intrusion automation sets it on intrusion, the
+    // cleanup automation clears it on disarm. The panel state stays
+    // armed_away throughout, so reason is the only reliable signal
+    // for the urgent UI.
+    const reasonRaw = (reason && reason.state) || '';
+    const alarmActive = stateVal === 'armed_away' && reasonRaw.length > 0;
+    // CSS class for colour / animation:
+    //   alarm active  → `triggered` (red pulse)
+    //   armed_away    → `armed`     (green)
+    //   disarmed      → `disarmed`
+    const cssClass = alarmActive ? 'triggered' : stateClass(stateVal);
+    stateName.className = 'state-name ' + cssClass;
+    // Display label.
+    const labelKey = alarmActive ? 'alarm.state.triggered' : 'alarm.state.' + stateVal;
+    stateName.textContent = t(labelKey) || stateVal.toUpperCase();
 
-    // Detail line. We distinguish three info contexts:
-    //   1. About to arm — countdown derived from auto-arm preconditions.
-    //   2. Pending — panel's entry-delay countdown to triggered.
-    //   3. Armed — how long the alarm has been armed.
-    //   4. Triggered — humanised reason + how long ago.
+    // Detail line. Three info contexts:
+    //   1. Disarmed + auto-arm converging → countdown to arm.
+    //   2. Armed + reason non-empty       → cause + how long ago.
+    //   3. Armed + reason empty           → how long armed.
     const detail = $('state-detail');
     let detailText = ' ';
     const arming = deriveArmingProgress({
@@ -197,32 +208,28 @@ async function tick() {
     });
     const stateSinceMs = new Date(panel.last_changed || panel.last_updated).getTime();
     const elapsedMs = Date.now() - stateSinceMs;
-    if (arming && arming.remainingMs > 0) {
-      // Visually emulate the "arming" state class so the eye picks up
-      // that something is happening, even though the panel itself is
-      // still `disarmed`.
+    if (alarmActive) {
+      const human = reasonRaw
+        .split(' · ')
+        .map((k) => t('alarm.cause.' + k))
+        .join(' · ');
+      // For "ago" use the trigger_reason last_changed if we have it
+      // — that's when the alarm fired; the panel's last_changed is
+      // when arm_away ran, which can be much earlier.
+      const reasonChangedMs = reason
+        ? new Date(reason.last_changed || reason.last_updated).getTime()
+        : Date.now();
+      detailText = t('alarm.detail.triggered', human, fmtElapsed(Date.now() - reasonChangedMs));
+    } else if (arming && arming.remainingMs > 0) {
       stateName.classList.add('arming');
       detailText = t('alarm.detail.arming', fmtElapsed(arming.remainingMs));
-    } else if (stateVal === 'pending') {
-      // Panel's entry-delay window: a sensor went on while armed; the
-      // user has `delay_time` seconds to disarm before triggered.
-      detailText = t('alarm.detail.pending', fmtElapsed(elapsedMs));
     } else if (stateVal === 'armed_away') {
       detailText = t('alarm.detail.armed', fmtElapsed(elapsedMs));
-    } else if (stateVal === 'triggered') {
-      const raw = (reason && reason.state) || '';
-      const human = raw
-        ? raw
-            .split(' · ')
-            .map((k) => t('alarm.cause.' + k))
-            .join(' · ')
-        : '?';
-      detailText = t('alarm.detail.triggered', human, fmtElapsed(elapsedMs));
     }
     detail.textContent = detailText;
 
-    // Buttons: ARM is only meaningful when fully disarmed; DISARM is
-    // meaningful in every non-disarmed state, including `pending`.
+    // Buttons: ARM is only meaningful when disarmed; DISARM is
+    // meaningful when armed (whether the alarm is currently firing or not).
     $('btn-arm').disabled = stateVal !== 'disarmed';
     $('btn-disarm').disabled = stateVal === 'disarmed';
 

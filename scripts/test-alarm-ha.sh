@@ -117,8 +117,8 @@ echo "→ HA target: $HA_HOST"
 echo
 
 # Engage test mode (siren / push route to alarm_test_log) and shorten
-# the quiet-hold window. delay_time (entry-delay grace) is baked into
-# alarm_control_panel YAML at 10 s so tests do wait ~11 s per trigger.
+# the quiet-hold window. The alarm uses the 2-state model — no
+# entry-delay; intrusion fires the siren + push immediately.
 set_boolean input_boolean.alarm_test_mode on
 set_number input_number.alarm_test_quiet_seconds 3
 
@@ -195,39 +195,33 @@ arm_away
 settle
 assert_state "$PANEL" armed_away "6. manual arm_away service call honoured"
 
-# ---- Scenario 7: armed_away → pending → triggered, reason captured ----------
-# delay_time is 10 s; wait 11 to clear the entry delay.
+# ---- Scenario 7: intrusion while armed_away fires the response -------------
+# 2-state model: panel stays armed_away; the alarm-active signal is a
+# non-empty alarm_trigger_reason + the side-effect log in test mode.
 reset_state
 arm_away; settle
 set_state binary_sensor.battery_room_door_contact on
-# Within delay_time we should be in `pending`.
-if wait_for_state "$PANEL" pending 2; then
-  ok "7. armed_away → pending on door open"
-else
-  fail "7. did not enter pending (state=$(state_of "$PANEL"))"
-fi
-# After delay_time we transition to triggered.
-if wait_for_state "$PANEL" triggered 13; then
-  ok "7b. pending → triggered after delay_time"
-else
-  fail "7b. did not enter triggered (state=$(state_of "$PANEL"))"
-fi
+sleep 2
+assert_state "$PANEL" armed_away "7. panel stays armed_away during intrusion (no pending/triggered)"
 reason=$(state_of input_text.alarm_trigger_reason)
-case "$reason" in *door*) ok "7c. trigger reason carries 'door' (got: $reason)" ;;
-                  *) fail "7c. expected 'door' in reason, got: $reason" ;;
+case "$reason" in *door*) ok "7b. trigger reason captures 'door' (got: $reason)" ;;
+                  *) fail "7b. expected 'door' in reason, got: $reason" ;;
 esac
 
-# ---- Scenario 8: triggered is latched — sensor clearing doesn't disarm -----
+# ---- Scenario 8: alarm-active signal is latched until disarm ---------------
+# Reason should NOT clear just because sensors quiet down.
 set_state binary_sensor.battery_room_door_contact off
 set_state binary_sensor.battery_room_motion_main_occupancy off
 set_state binary_sensor.battery_room_motion_aux_occupancy off
 sleep 2
-assert_state "$PANEL" triggered "8. triggered latched after sensors quiet"
+reason=$(state_of input_text.alarm_trigger_reason)
+[ -n "$reason" ] && ok "8. trigger reason latched after sensors quiet (got: $reason)" \
+  || fail "8. trigger reason cleared without disarm"
 
 # ---- Scenario 9: side-effects logged in test mode ---------------------------
 log=$(state_of input_text.alarm_test_log)
-case "$log" in *push:*|*siren_on:*) ok "9. side-effects logged (last entry: $log)" ;;
-               *) fail "9. expected push/siren_on in test log, got: $log" ;;
+case "$log" in *push:*siren_on:*|*siren_on:*push:*) ok "9. both push + siren_on logged (last entry: $log)" ;;
+               *) fail "9. expected both push: and siren_on: in test log, got: $log" ;;
 esac
 
 # ---- Scenario 10: manual disarm clears state + reason + logs siren_off -----
@@ -256,23 +250,18 @@ set_state binary_sensor.battery_room_door_contact off
 sleep 1
 assert_state binary_sensor.alarm_sensors_ok on "11c. alarm_sensors_ok recovers when sensor returns"
 
-# ---- Scenario 12: pending → disarmed during entry delay ----------------
-# User has delay_time seconds to disarm before the siren fires.
+# ---- Scenario 12: intrusion is instant — no entry-delay grace --------------
+# 2-state model: a sensor opening while armed fires the response
+# immediately, no chance to disarm before the siren engages. This
+# matches the "I want only 2 states" simplification — there is no
+# "pending" interval where the user could intervene.
 reset_state
 arm_away; settle
 set_state binary_sensor.battery_room_motion_aux_occupancy on
-wait_for_state "$PANEL" pending 2 || fail "12-setup. failed to enter pending"
-# Disarm during the entry-delay window.
-sleep 2  # part-way through the 10s delay
-set_state binary_sensor.battery_room_motion_aux_occupancy off
-disarm
-settle
-assert_state "$PANEL" disarmed "12. disarm during entry delay returns to disarmed (no trigger)"
+sleep 1
 log=$(state_of input_text.alarm_test_log)
-# Should have logged siren_off (from disarm cleanup) but NOT siren_on
-# (because we never crossed into triggered).
-case "$log" in *siren_on*) fail "12b. siren_on logged even though we never triggered (got: $log)" ;;
-               *) ok "12b. no siren_on logged — early disarm prevented trigger" ;;
+case "$log" in *siren_on*) ok "12. siren fires instantly on sensor open (no grace window)" ;;
+               *) fail "12. siren did not fire after 1s (log: $log)" ;;
 esac
 
 # ---- Teardown ---------------------------------------------------------------

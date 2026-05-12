@@ -81,16 +81,15 @@ const T = {
     'alarm.toggle.main.title': 'Wróć do panelu głównego',
     'alarm.state.disarmed': 'ROZBROJONY',
     'alarm.state.arming': 'UZBRAJANIE',
-    // `armed_away` is HA's canonical name; both keys exist so the
-    // dashboard can use either without a translation lookup hop.
+    // `armed_away` is HA's canonical name. `armed` is the friendlier
+    // alias the dashboard CSS uses (collapsed via stateClass()).
     'alarm.state.armed': 'UZBROJONY',
     'alarm.state.armed_away': 'UZBROJONY',
-    // `pending` is the panel's entry-delay state — sensor went on,
-    // disarm-now grace window before the siren fires.
-    'alarm.state.pending': 'ALARM ZA CHWILĘ',
+    // `triggered` is now a UI-only state — the panel itself doesn't
+    // enter it (2-state model). Used when alarm_trigger_reason is
+    // non-empty to show the urgent "ALARM" hero.
     'alarm.state.triggered': 'ALARM',
     'alarm.detail.arming': 'uzbrojenie za {0} — musi być cicho',
-    'alarm.detail.pending': 'rozbrój teraz — alarm za {0}',
     'alarm.detail.armed': 'uzbrojony od {0}',
     'alarm.detail.triggered': '{0} · {1} temu',
     'alarm.cause.door': 'otwarcie drzwi',
@@ -192,10 +191,8 @@ const T = {
     'alarm.state.arming': 'ARMING',
     'alarm.state.armed': 'ARMED',
     'alarm.state.armed_away': 'ARMED',
-    'alarm.state.pending': 'TRIGGERING',
     'alarm.state.triggered': 'TRIGGERED',
     'alarm.detail.arming': 'arming in {0} — needs quiet',
-    'alarm.detail.pending': 'disarm now — alarm in {0}',
     'alarm.detail.armed': 'armed for {0}',
     'alarm.detail.triggered': '{0} · {1} ago',
     'alarm.cause.door': 'door opened',

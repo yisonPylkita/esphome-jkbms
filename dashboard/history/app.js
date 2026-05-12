@@ -30,15 +30,15 @@ const E = {
   door: 'binary_sensor.battery_room_door_contact',
 };
 
-// alarm_control_panel uses `armed_away` for the armed state and
-// `pending` for the entry-delay window before triggered. The old
-// FSM had a single `armed`. Canonicalise so the rest of this file
-// treats `armed_away` and the legacy `armed` interchangeably, and
-// treats `pending` as an alarm-active state (it's already past the
-// armed→pending transition by the time it's recorded).
+// alarm_control_panel uses `armed_away` for the armed state. The
+// legacy FSM had a single `armed`; the new 2-state model has no
+// `pending` or `triggered` (panel stays armed_away throughout an
+// intrusion). Old recorder data may still reference those — fold
+// them into `armed` so historical timelines render usefully.
 function canonState(s) {
   if (s === 'armed_away') return 'armed';
   if (s === 'pending') return 'armed';
+  if (s === 'triggered') return 'armed';
   return s;
 }
 
