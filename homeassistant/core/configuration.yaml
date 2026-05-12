@@ -11,6 +11,12 @@ scene: !include scenes.yaml
 
 homeassistant:
   internal_url: "http://homeassistant:8123"
+  # Canonical outside-the-LAN URL — Tailscale-served HTTPS endpoint
+  # (`share_homeassistant: serve` on the Tailscale add-on, port 443,
+  # Let's Encrypt cert). Setting it makes the mobile app's URL-based
+  # notification actions (the "Otwórz panel" button) resolve to the
+  # public HTTPS form, not the LAN HTTP one.
+  external_url: "https://fotowoltaika.tailaa1b4.ts.net"
   packages: !include_dir_named packages
 
 http:
@@ -18,3 +24,20 @@ http:
   trusted_proxies:
     - 127.0.0.1
     - ::1
+
+# Recorder: 90-day rolling window for short-term history. Cell voltages
+# and resistances are throttled at the ESPHome source (≤1 Hz + 1 mV
+# delta for voltage, ≤0.1 Hz + 1 mΩ delta for resistance) so the
+# firehose is already tamed upstream — no explicit excludes needed.
+#
+# Long-term statistics (hourly min/mean/max) run automatically for any
+# sensor with `state_class: measurement`, which includes every cell
+# voltage and resistance via the upstream `jk_bms_ble` component, and
+# are kept forever in a separate compact table (~28 MB/year for the
+# whole pack). That's the multi-year cell-health story.
+#
+# `commit_interval: 30` batches writes — at our event rate, every
+# 30 s is plenty; reduces SD-card wear vs. the default of 1 s.
+recorder:
+  purge_keep_days: 90
+  commit_interval: 30

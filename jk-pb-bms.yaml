@@ -140,48 +140,99 @@ sensor:
     jk_bms_ble_id: bms0
     total_voltage:
       name: "total voltage"
+      filters:
+        - throttle: 1s
+        - delta: 0.01
     current:
       name: "current"
+      filters:
+        - throttle: 1s
+        - delta: 0.05
     power:
       name: "power"
+      filters:
+        - throttle: 1s
+        - delta: 1.0
     charging_power:
       name: "charging power"
+      filters:
+        - throttle: 1s
+        - delta: 1.0
     discharging_power:
       name: "discharging power"
+      filters:
+        - throttle: 1s
+        - delta: 1.0
     state_of_charge:
       name: "state of charge"
+      filters:
+        - throttle: 10s
+        - delta: 0.1
     state_of_health:
       name: "state of health"
     capacity_remaining:
       name: "capacity remaining"
+      filters:
+        - throttle: 30s
+        - delta: 0.01
     total_battery_capacity_setting:
       name: "total battery capacity"
     charging_cycles:
       name: "charging cycles"
     total_charging_cycle_capacity:
       name: "total charging cycle capacity"
+      filters:
+        - throttle: 60s
+        - delta: 0.1
     delta_cell_voltage:
       name: "delta cell voltage"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     average_cell_voltage:
       name: "average cell voltage"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     min_cell_voltage:
       name: "min cell voltage"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     max_cell_voltage:
       name: "max cell voltage"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     min_voltage_cell:
       name: "min voltage cell"
     max_voltage_cell:
       name: "max voltage cell"
     temperature_sensor_1:
       name: "temperature sensor 1"
+      filters:
+        - throttle: 10s
+        - delta: 0.1
     temperature_sensor_2:
       name: "temperature sensor 2"
+      filters:
+        - throttle: 10s
+        - delta: 0.1
     temperature_sensor_3:
       name: "temperature sensor 3"
+      filters:
+        - throttle: 10s
+        - delta: 0.1
     temperature_sensor_4:
       name: "temperature sensor 4"
+      filters:
+        - throttle: 10s
+        - delta: 0.1
     temperature_sensor_5:
       name: "temperature sensor 5"
+      filters:
+        - throttle: 10s
+        - delta: 0.1
     power_tube_temperature:
       name: "power tube temperature"
     balancing_current:
@@ -196,72 +247,168 @@ sensor:
     jk_bms_ble_id: bms0
     cell_voltage_1:
       name: "cell voltage 1"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_2:
       name: "cell voltage 2"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_3:
       name: "cell voltage 3"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_4:
       name: "cell voltage 4"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_5:
       name: "cell voltage 5"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_6:
       name: "cell voltage 6"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_7:
       name: "cell voltage 7"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_8:
       name: "cell voltage 8"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_9:
       name: "cell voltage 9"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_10:
       name: "cell voltage 10"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_11:
       name: "cell voltage 11"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_12:
       name: "cell voltage 12"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_13:
       name: "cell voltage 13"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_14:
       name: "cell voltage 14"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_15:
       name: "cell voltage 15"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
     cell_voltage_16:
       name: "cell voltage 16"
+      filters:
+        - throttle: 1s
+        - delta: 0.001
 
   # ---- per-cell wire resistance (16S) ----
   - platform: jk_bms_ble
     jk_bms_ble_id: bms0
     cell_resistance_1:
       name: "cell resistance 1"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_2:
       name: "cell resistance 2"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_3:
       name: "cell resistance 3"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_4:
       name: "cell resistance 4"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_5:
       name: "cell resistance 5"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_6:
       name: "cell resistance 6"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_7:
       name: "cell resistance 7"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_8:
       name: "cell resistance 8"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_9:
       name: "cell resistance 9"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_10:
       name: "cell resistance 10"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_11:
       name: "cell resistance 11"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_12:
       name: "cell resistance 12"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_13:
       name: "cell resistance 13"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_14:
       name: "cell resistance 14"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_15:
       name: "cell resistance 15"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
     cell_resistance_16:
       name: "cell resistance 16"
+      filters:
+        - throttle: 10s
+        - delta: 0.001
 
 text_sensor:
   - platform: wifi_info
