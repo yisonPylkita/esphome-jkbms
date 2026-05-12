@@ -27,6 +27,13 @@ check:
 test:
     scripts/test.sh
 
+# Integration test: drives the live HA alarm package via REST. Requires
+# secrets.yaml (or HA_HOST / HA_TOKEN env). Side-effects (siren, push)
+# are routed to a test log entity so the suite is safe to run while the
+# real alarm is in service. Not in `just ci` — CI has no live HA.
+test-alarm:
+    scripts/test-alarm-ha.sh
+
 # What CI runs: format-check + every gate + tests, in order.
 ci: fmt-check check test
 

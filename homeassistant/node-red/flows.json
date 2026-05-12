@@ -3,8 +3,8 @@
         "id": "tab_battery_room_alarm",
         "type": "tab",
         "label": "Battery Room Alarm",
-        "disabled": false,
-        "info": "Battery-room alarm. Watches the door + 2 motion sensors and writes\nto `input_select.alarm_state`. State machine logic is duplicated from\n`dashboard/lib/alarm-fsm.js` — `scripts/check.sh` enforces they stay\nin sync.\n\nTransitions:\n  disarmed → arming (auto-arm conditions met) OR (UI sets 'arming')\n  arming → armed (after `alarm_arming_quiet_minutes` of quiet)\n  armed → triggered (door open OR motion after grace)\n  * → disarmed (UI sets 'disarmed')\n\nOutputs on transitions:\n  → triggered: siren start over MQTT, push notification to all mobile apps\n  → disarmed: siren stop over MQTT\n  always: write state, trigger reason to HA helpers"
+        "disabled": true,
+        "info": "> **DISABLED** as of 2026-05-12. The alarm now lives entirely in\n> Home Assistant; see homeassistant/alarm-helpers.yaml. Tab is kept\n> here for one release as a fallback before removing the file.\n\nBattery-room alarm. Watches the door + 2 motion sensors and writes\nto `input_select.alarm_state`. State machine logic is duplicated from\n`dashboard/lib/alarm-fsm.js` — `scripts/check.sh` enforces they stay\nin sync.\n\nTransitions:\n  disarmed → arming (auto-arm conditions met) OR (UI sets 'arming')\n  arming → armed (after `alarm_arming_quiet_minutes` of quiet)\n  armed → triggered (door open OR motion after grace)\n  * → disarmed (UI sets 'disarmed')\n\nOutputs on transitions:\n  → triggered: siren start over MQTT, push notification to all mobile apps\n  → disarmed: siren stop over MQTT\n  always: write state, trigger reason to HA helpers"
     },
     {
         "id": "f2eb633a.33c36",
@@ -101,7 +101,14 @@
         "forUnits": "minutes",
         "entityId": "binary_sensor.battery_room_door_contact",
         "entityIdType": "exact",
-        "outputOnStateUnknownAndUnavailable": false
+        "outputOnStateUnknownAndUnavailable": false,
+        "entities": {
+            "entity": [
+                "binary_sensor.battery_room_door_contact"
+            ],
+            "substring": [],
+            "regex": []
+        }
     },
     {
         "id": "trg_motion_main",
@@ -143,7 +150,14 @@
         "forUnits": "minutes",
         "entityId": "binary_sensor.battery_room_motion_main_occupancy",
         "entityIdType": "exact",
-        "outputOnStateUnknownAndUnavailable": false
+        "outputOnStateUnknownAndUnavailable": false,
+        "entities": {
+            "entity": [
+                "binary_sensor.battery_room_motion_main_occupancy"
+            ],
+            "substring": [],
+            "regex": []
+        }
     },
     {
         "id": "trg_motion_aux",
@@ -185,7 +199,14 @@
         "forUnits": "minutes",
         "entityId": "binary_sensor.battery_room_motion_aux_occupancy",
         "entityIdType": "exact",
-        "outputOnStateUnknownAndUnavailable": false
+        "outputOnStateUnknownAndUnavailable": false,
+        "entities": {
+            "entity": [
+                "binary_sensor.battery_room_motion_aux_occupancy"
+            ],
+            "substring": [],
+            "regex": []
+        }
     },
     {
         "id": "trg_state_extern",
@@ -227,7 +248,14 @@
         "forUnits": "minutes",
         "entityId": "input_select.alarm_state",
         "entityIdType": "exact",
-        "outputOnStateUnknownAndUnavailable": false
+        "outputOnStateUnknownAndUnavailable": false,
+        "entities": {
+            "entity": [
+                "input_select.alarm_state"
+            ],
+            "substring": [],
+            "regex": []
+        }
     },
     {
         "id": "fsm",

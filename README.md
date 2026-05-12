@@ -2,8 +2,8 @@
 
 ESPHome firmware for an ESP32-C3 that bridges a JK BMS (PB-series, 16-cell
 LFP) over Bluetooth Low Energy to Home Assistant, plus four web dashboards
-served from HA (bms / alarm / advanced / history), plus a Node-RED flow
-that runs the battery-room intrusion alarm.
+served from HA (bms / alarm / advanced / history), plus a battery-room
+intrusion alarm expressed entirely as Home Assistant automations.
 
 ![Main BMS dashboard — half-circle SOC gauge, 12-cell battery bar, power + runtime prediction](docs/screenshots/dashboard-main.png)
 
@@ -33,13 +33,17 @@ that runs the battery-room intrusion alarm.
   armed time / door-open time / trigger + disarm counts; reachable from
   the alarm dashboard via the `historia ›` link. Deploys to
   `/local/alarm-history.html`.
-- **`homeassistant/node-red/flows.json`** — full Node-RED flow snapshot
-  including the battery-room intrusion alarm FSM (`disarmed → arming →
-armed → triggered`) driven by Zigbee motion + door sensors, firing the
-  Zigbee siren and critical-priority push notifications on trip.
-- **`homeassistant/alarm-helpers.yaml`** — HA helpers (input_boolean /
-  input_number / input_select / input_text) consumed by the alarm flow,
-  deployed into `/config/packages/jk_alarm.yaml`.
+- **`homeassistant/alarm-helpers.yaml`** — the entire alarm system as a
+  single HA package: helpers (input_boolean / input_number / input_select /
+  input_text), the FSM expressed as automations (`disarmed → arming →
+armed → triggered`) driven by Zigbee motion + door sensors, and the
+  side-effects (Zigbee siren + critical-priority push on trip). Deploys
+  to `/config/packages/jk_alarm.yaml`. Integration-tested by
+  `scripts/test-alarm-ha.sh` — see "Testing the alarm" below.
+- **`homeassistant/node-red/flows.json`** — Node-RED workspace snapshot.
+  The alarm tab is **disabled** (the package above replaced it); kept
+  here for one release as a rollback option and as the future home for
+  any flows that need Node-RED's visual editor.
 - **`scripts/deploy-ha.sh`** — one-shot deploy / re-deploy to a Home
   Assistant box (substitutes the API token, mirrors fonts, idempotently
   installs helpers, reloads helper domains, runs `ha core check`).
@@ -192,26 +196,52 @@ Press **A** on the main page to swap to advanced; the `alarm ›`
 link goes to the alarm dashboard, which has its own `historia ›` to
 the history view.
 
-### 6. Node-RED alarm flow (optional)
+### 6. Alarm — pure Home Assistant package
 
-`homeassistant/node-red/flows.json` is the full Node-RED flow snapshot,
-including the battery-room alarm FSM. It reads the door + 2 motion
-sensors, writes `input_select.alarm_state`, publishes siren start/stop
-over MQTT, and pushes a critical-priority alert to the configured
-mobile_app targets on a trip.
+The whole alarm system lives in `homeassistant/alarm-helpers.yaml`,
+deployed by `just deploy` to `/config/packages/jk_alarm.yaml`. Helpers,
+FSM transitions, and side-effect automations are co-located in that one
+file so the alarm is a single auditable unit. No Node-RED running for
+this; the old flow stays in the repo (disabled) as a rollback option.
 
-To import:
+State machine (`input_select.alarm_state`):
 
-1. Open Node-RED in HA → hamburger menu → Import → paste the contents of
-   the flow JSON → Import.
-2. Each HA node will show "missing config" — open one, pick your existing
-   Home Assistant server in the Server dropdown, save. NR auto-applies
-   it to the rest.
-3. Deploy.
+```
+disarmed ─[auto-arm conditions hold]→ arming
+arming   ─[same conditions hold for `quiet_minutes`]→ armed
+armed    ─[any sensor opens after `grace_seconds`]→ triggered
+*        ─[user clicks DISARM in dashboard]→ disarmed
+```
 
-`just restore --configs-only` will push the file to
-`/config/node-red/flows.json` automatically; you still need to assign
-the HA server config on first start (see Disaster recovery below).
+The dashboard's ARM / DISARM buttons write directly to the input_select;
+the automations watch sensor state changes (template triggers with
+`for:` enforce continuous quiet) and drive the transitions.
+
+### Testing the alarm
+
+`scripts/test-alarm-ha.sh` (or `just test-alarm`) drives the live HA
+instance via REST: pokes sensor states, waits for the right
+automation to fire, asserts the resulting `input_select.alarm_state`.
+Mirrors every scenario from `tests/alarm-fsm.test.js` so the
+implementation stays behaviour-equivalent.
+
+Destructive side-effects are stubbed by flipping
+`input_boolean.alarm_test_mode` on — the siren and push automations
+write to `input_text.alarm_test_log` instead of calling
+`siren.turn_on` / `notify.alarm_recipients`. Production sirens stay
+quiet, phones stay silent.
+
+The same primitives work interactively in the HA UI:
+
+- **Developer Tools → States** — overwrite any binary*sensor or
+  input*\*; the automations re-evaluate on the synthetic value.
+- **Developer Tools → Services** — fire any service with any payload.
+- **Automation Traces** (next to each automation in the UI) — the last
+  five runs are persisted with a full step-by-step trace: which
+  trigger fired, what each condition evaluated to, every action's
+  variables. The Node-RED debug pane on steroids.
+- **"Run actions"** button — execute the action sequence without
+  satisfying the trigger; useful when verifying side-effect chains.
 
 ## Project layout
 

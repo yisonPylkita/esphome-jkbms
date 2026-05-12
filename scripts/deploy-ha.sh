@@ -226,9 +226,9 @@ $SCP "$HERE/homeassistant/alarm-helpers.yaml"  "$HA_USER@$HA_HOST:/config/packag
 echo "→ Validating HA config..."
 $SSH "ha core check" >/dev/null
 
-# ---- 7. Reload helper domains (no full restart needed for input_*). ----
-echo "→ Reloading helper domains..."
-for d in input_boolean input_number input_text input_select; do
+# ---- 7. Reload helper domains + automations (no full HA restart). ----
+echo "→ Reloading helper domains + automations..."
+for d in input_boolean input_number input_text input_select automation; do
   /usr/bin/curl -s -X POST -H "Authorization: Bearer $HA_TOKEN" \
     "http://$HA_HOST:8123/api/services/$d/reload" -o /dev/null -w "  %{http_code} $d\n"
 done
