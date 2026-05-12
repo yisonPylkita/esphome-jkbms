@@ -9,17 +9,18 @@
 #                armed_away — there is no separate `triggered` state.
 #                Disarming silences the siren immediately.
 #
-# Why we still use `alarm_control_panel.manual` for a 2-state model:
+# Why we use a `template` alarm_control_panel for a 2-state model:
 # the iOS / Android mobile apps render the alarm_control_panel domain
 # natively — lock-screen disarm widget, alarm-domain push styling,
-# Apple Home / Google Home integration. An `input_boolean` would lose
-# all of that. We just don't call `alarm_trigger` on it, so it never
-# enters the platform's built-in `pending` / `triggered` states.
+# Apple Home / Google Home integration. We want to keep that, but
+# the built-in `manual` platform always exposes every arm mode in
+# the widget. A template panel lets us define only the actions we
+# care about (`arm_away` + `disarm`), so the widget collapses to
+# those two buttons.
 #
 # Deployed by `scripts/deploy-ha.sh` as `/config/packages/jk_alarm.yaml`.
-# Editing the `alarm_control_panel:` block below requires `ha core
-# restart` (no runtime reload path). Helpers / automations / templates
-# reload via `automation.reload` / `homeassistant.reload_core_config`.
+# Template entities reload via `template.reload`; automation / helper
+# / `homeassistant:` changes reload via their respective services.
 #
 # Testability:
 #   `input_boolean.alarm_test_mode` routes destructive side-effects
@@ -34,6 +35,13 @@ input_boolean:
     name: Alarm auto-arm enabled
     icon: mdi:shield-sync
     initial: true
+  # The actual armed/disarmed state. The template
+  # `alarm_control_panel.battery_room` below reads this; arming and
+  # disarming write to it via the panel's services.
+  alarm_armed:
+    name: Alarm armed
+    icon: mdi:shield-lock
+    initial: false
   # When on, the siren / push automations log to alarm_test_log
   # instead of calling real services. Used by the integration test
   # and any time you want to step through transitions safely.
@@ -89,29 +97,56 @@ input_text:
     initial: ""
     max: 255
 
-# ---- The alarm panel itself ----
-# Minimal config — we don't use the platform's `pending` (entry-delay)
-# or `triggered` states, just the disarmed ↔ armed_away transition.
-# `delay_time: 0` would normally skip pending; we leave it set
-# anyway since `alarm_trigger` is never called.
-alarm_control_panel:
-  - platform: manual
-    name: Battery Room
-    code_arm_required: false
-    arming_time: 0
-    delay_time: 0
-    trigger_time: 0
-    armed_away:
-      arming_time: 0
-      delay_time: 0
-      trigger_time: 0
-
-# ---- Derived state ----
-# `alarm_sensors_ok` is true iff every required sensor is reporting a
-# useful state (not unavailable, not unknown). The auto-arm automation
-# gates on this; the dashboard surfaces it as a warning banner when
-# false.
+# ---- The alarm panel + derived state ----
+#
+# We use a `template` alarm_control_panel instead of the `manual`
+# platform because `manual` always exposes every arm mode (Home /
+# Away / Night / Vacation / Custom) in the mobile-app native widget,
+# and we want strictly two: armed-away and disarmed. Template panels
+# expose only the arm modes whose actions you define — so by listing
+# only `arm_away:` and `disarm:` below, the widget collapses to those
+# two buttons.
+#
+# Caveat: the button label for `arm_away` is hardcoded in HA's
+# frontend as "Away" (or its localised equivalent). It cannot be
+# renamed to "Armed" without dropping the alarm_control_panel domain
+# entirely. We accept that trade-off to keep the native iOS / Android
+# lock-screen alarm widget.
+#
+# The real source of truth is `input_boolean.alarm_armed`. The panel
+# is a thin presentation layer over it. All automations and the
+# dashboard still talk to `alarm_control_panel.battery_room` — they
+# never have to know about the underlying input_boolean.
 template:
+  - alarm_control_panel:
+      - name: Battery Room
+        unique_id: battery_room_alarm
+        # No PIN code needed to arm or disarm. Without these flags
+        # the template panel defaults to `code_arm_required: true`
+        # and ServiceValidationError-s every arm_away call without
+        # a code. `code_format: no_code` also drops the PIN-entry
+        # dialog from the mobile widget — purely a UX cleanup.
+        code_arm_required: false
+        code_format: no_code
+        state: >-
+          {% if is_state('input_boolean.alarm_armed', 'on') %}
+            armed_away
+          {% else %}
+            disarmed
+          {% endif %}
+        arm_away:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.alarm_armed
+        disarm:
+          - service: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.alarm_armed
+
+  # `alarm_sensors_ok` is true iff every required sensor is reporting a
+  # useful state (not unavailable, not unknown). The auto-arm automation
+  # gates on this; the dashboard surfaces it as a warning banner when
+  # false.
   - binary_sensor:
       - name: Alarm sensors ok
         unique_id: alarm_sensors_ok

@@ -130,6 +130,15 @@ reset_state() {
   set_state binary_sensor.battery_room_motion_aux_occupancy off
   set_text input_text.alarm_test_log ""
   set_text input_text.alarm_trigger_reason ""
+  # Force the auto-arm template trigger's `for:` window to restart
+  # with the *current* test_mode reading. The `for:` duration is
+  # evaluated once when the template first transitions to true, so
+  # if the trigger fell into a true state with test_mode off (5 min
+  # window), flipping test_mode on later doesn't shorten the existing
+  # timer. Toggling auto_arm off→on makes the template re-cross
+  # false→true under the test-mode value.
+  set_boolean input_boolean.alarm_auto_arm_enabled off
+  settle
   set_boolean input_boolean.alarm_auto_arm_enabled on
   disarm
   settle
